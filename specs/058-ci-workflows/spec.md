@@ -93,7 +93,7 @@ This section is the plan (CONTRIBUTING, "How changes are made"). It holds the ar
 A round is two jobs in the caller's workflow file, plus the caller's own label job.
 
 ```text
-caller's workflow file: on:, permissions: {}, concurrency:, source
+caller's workflow file: on:, permissions: {}, source
 │
 ├─ job review ─── permissions: contents, pull-requests, checks, actions: read
 │                 steps:
@@ -192,7 +192,7 @@ The prompt, the model and provider inputs, `max_turns`, the instructions file, t
 *   **A caller grants `pull-requests: write` to the review job.** The agent then holds a write token. Mitigation: the starter sets `permissions: {}` at workflow level and grants per job, and `docs/ci-action.md` says why. Not enforceable from loupe.
 *   **The agent reads the read-only token.** The review job's `GITHUB_TOKEN` can read the repository and its pull requests. `ci/capture` never stores or exports it, but an agent that the caller passes `${{ github.token }}` to can still read it. It cannot write. On a private repository, an agent can already read the code, so the token adds little.
 *   **A prompt-injected agent writes a misleading run.** The trust check stops a post to another pull request or series. It cannot stop false findings, which is the same risk as any unattended review.
-*   **Two rounds at the same head.** Two requests in quick succession both run, spend two model runs, and edit the same sticky review twice. The starter's workflow-level concurrency group queues them. Without it, the publish job's group still serializes the posts, and `loupe publish` refuses a stale round with `head-moved` when the head has moved.
+*   **Two rounds at the same head.** Two requests in quick succession both run, spend two model runs, and edit the same sticky review twice. The starter's concurrency group on the review job queues them. It sits on the job, not the workflow, because GitHub keeps one waiting run per group, and a run whose review job is skipped would otherwise cancel a waiting round. Without it, the publish job's group still serializes the posts, and `loupe publish` refuses a stale round with `head-moved` when the head has moved.
 *   **A rerun cannot publish.** "Re-run failed jobs" makes attempt 2, and publish refuses every attempt after the first. The fix is a fresh round by the label, as today. Safe reruns are a Future Improvement.
 *   **Size.** The artifact is the data root: the diff and the run's JSON files. It grows with the diff, not the repository. A diff past the artifact size limit fails the upload, and the step fails. No limit beyond GitHub's own applies.
 
@@ -379,10 +379,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   review:
     # Policy: edit freely. A label or a dispatch overrides the automatic skips.
@@ -393,6 +389,11 @@ jobs:
        !startsWith(github.head_ref, 'release-please--') &&
        !endsWith(github.event.pull_request.user.login, '[bot]'))
     runs-on: ubuntu-latest
+    # On the job, not the workflow: only runs that pass the if above take a place, so an unrelated label cannot
+    # cancel a round that is waiting its turn.
+    concurrency:
+      group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read

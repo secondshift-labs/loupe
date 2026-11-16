@@ -56,7 +56,7 @@ A round is two jobs in your workflow file: a review job and a publish job. loupe
 - `secondshift-labs/loupe/ci/save` uploads the run for the publish job.
 - `secondshift-labs/loupe/.github/workflows/publish.yml` is a reusable workflow. It restores the run, checks it names this pull request and source, and publishes it unattended. It runs no step of yours.
 
-[`secondshift-labs/ai-review-workflows`](https://github.com/secondshift-labs/ai-review-workflows) is the reference Claude reviewer built on these pieces.
+Spec 058's migration rebuilds the reference Claude reviewer on these pieces as `secondshift-labs/ai-review-workflows`. Until then, loupe reviews its own pull requests through [`.github/workflows/review.yml`](../.github/workflows/review.yml), which calls the older bundled `eriksaulnier/loupe-workflows`.
 
 ### Set up a caller
 
@@ -82,10 +82,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   review:
     # Policy: edit freely. A label or a dispatch overrides the automatic skips.
@@ -96,6 +92,11 @@ jobs:
        !startsWith(github.head_ref, 'release-please--') &&
        !endsWith(github.event.pull_request.user.login, '[bot]'))
     runs-on: ubuntu-latest
+    # On the job, not the workflow: only runs that pass the if above take a place, so an unrelated label cannot
+    # cancel a round that is waiting its turn.
+    concurrency:
+      group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read

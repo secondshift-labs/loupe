@@ -119,6 +119,25 @@ type Server struct {
 	nextID         int64
 	onCreate       func(*http.Request)
 	onUpdate       func(*http.Request)
+	checkRuns      map[commitKey][]CheckRun
+	workflowRuns   map[repoKey][]WorkflowRun
+}
+
+type repoKey struct{ owner, repo string }
+
+type commitKey struct{ owner, repo, sha string }
+
+// CheckRun is one check run on a commit. An empty Conclusion or DetailsURL is sent as null, as GitHub does for a run
+// that has not finished or links nowhere.
+type CheckRun struct {
+	Name, Status, Conclusion, DetailsURL string
+}
+
+// WorkflowRun is one Actions run. Path is the workflow file, such as .github/workflows/review.yml.
+type WorkflowRun struct {
+	ID      int64
+	Path    string
+	HeadSHA string
 }
 
 func New(t *testing.T) *Server {
@@ -142,6 +161,8 @@ func Start() (s *Server, stop func()) {
 		served:        map[string]int{},
 		comparisons:   map[compareKey]github.Comparison{},
 		commits:       map[prKey][]github.Commit{},
+		checkRuns:     map[commitKey][]CheckRun{},
+		workflowRuns:  map[repoKey][]WorkflowRun{},
 		nextID:        1000,
 	}
 	mux := http.NewServeMux()
@@ -156,6 +177,8 @@ func Start() (s *Server, stop func()) {
 	mux.HandleFunc("GET /repos/{owner}/{repo}/compare/{basehead}", s.getComparison)
 	mux.HandleFunc("GET /repos/{owner}/{repo}/issues/{number}/comments", s.listIssueComments)
 	mux.HandleFunc("POST /graphql", s.graphQL)
+	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}/check-runs", s.listCheckRuns)
+	mux.HandleFunc("GET /repos/{owner}/{repo}/actions/runs", s.listWorkflowRuns)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := s.record(r); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"message": err.Error()})
@@ -311,6 +334,22 @@ func (s *Server) SetCommits(owner, repo string, number int, commits ...github.Co
 
 // PullRequestCommitCap is the most commits GitHub lists for a pull request.
 const PullRequestCommitCap = 250
+
+// SeedCheckRun adds a check run on sha, listed in the order seeded.
+func (s *Server) SeedCheckRun(owner, repo, sha string, r CheckRun) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := commitKey{owner, repo, sha}
+	s.checkRuns[key] = append(s.checkRuns[key], r)
+}
+
+// SeedWorkflowRun adds an Actions run to the repository, listed in the order seeded and filtered by head_sha.
+func (s *Server) SeedWorkflowRun(owner, repo string, r WorkflowRun) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := repoKey{owner, repo}
+	s.workflowRuns[key] = append(s.workflowRuns[key], r)
+}
 
 func (s *Server) SetViewer(login string) {
 	s.mu.Lock()
@@ -889,7 +928,8 @@ func reviewState(event string) string {
 func wirePR(pr github.PullRequest, branch string, single bool) map[string]any {
 	var headRepo any
 	if pr.HeadOwner != "" {
-		headRepo = map[string]any{"name": pr.HeadRepo, "owner": map[string]any{"login": pr.HeadOwner}}
+		headRepo = map[string]any{"name": pr.HeadRepo, "full_name": pr.HeadOwner + "/" + pr.HeadRepo,
+			"owner": map[string]any{"login": pr.HeadOwner}}
 	}
 	out := map[string]any{
 		"number":   pr.Number,
@@ -919,6 +959,45 @@ func wireReview(rv github.Review) map[string]any {
 		out["submitted_at"] = rv.SubmittedAt.UTC().Format(time.RFC3339)
 	}
 	return out
+}
+
+func (s *Server) listCheckRuns(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	all := s.checkRuns[commitKey{r.PathValue("owner"), r.PathValue("repo"), r.PathValue("sha")}]
+	s.mu.Unlock()
+	start, end := s.restPage(w, r, len(all))
+	out := make([]any, 0, end-start)
+	for _, c := range all[start:end] {
+		out = append(out, map[string]any{"name": c.Name, "status": c.Status, "conclusion": nullable(c.Conclusion),
+			"details_url": nullable(c.DetailsURL)})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(all), "check_runs": out})
+}
+
+func (s *Server) listWorkflowRuns(w http.ResponseWriter, r *http.Request) {
+	head := r.URL.Query().Get("head_sha")
+	s.mu.Lock()
+	all := s.workflowRuns[repoKey{r.PathValue("owner"), r.PathValue("repo")}]
+	s.mu.Unlock()
+	var matched []WorkflowRun
+	for _, run := range all {
+		if head == "" || run.HeadSHA == head {
+			matched = append(matched, run)
+		}
+	}
+	start, end := s.restPage(w, r, len(matched))
+	out := make([]any, 0, end-start)
+	for _, run := range matched[start:end] {
+		out = append(out, map[string]any{"id": run.ID, "path": run.Path, "head_sha": run.HeadSHA})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(matched), "workflow_runs": out})
+}
+
+func nullable(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func notFound(w http.ResponseWriter) {

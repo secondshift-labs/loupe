@@ -65,6 +65,10 @@ and a ref, e-1 onward, that loupe assess takes. A finding the previous round did
 is not carried. Each id there belongs to its own round, and the current round reuses it from
 f-001, so published text names an earlier finding by its subject, never by its id.
 
+Later rounds: run loupe show --previous. Assess every earlier entry with
+loupe assess <refs> --status open|addressed. File only new problems with loupe add, then run
+loupe summary. An earlier finding left unassessed does not carry forward to the next round.
+
 Result (--previous --json):
   {"loupe": 1, "ok": true, "command": "show", "run": "owner/repo#123@2",
    "dir": "/path/to/run",

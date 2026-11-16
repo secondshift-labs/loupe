@@ -19,6 +19,7 @@
 #   - internal/cli/capture_test.go: http://github.com/o/r/pull/12 and https://gitlab.com/o/r/pull/12 (rejected URLs)
 #   - internal/gitx/gitx_test.go: https://gitlab.com/o/r, https://github.com/o, and https://github.com/.insteadOf (a Git
 #     config key)
+#   - internal/cli/capture_script_test.go: https://github.com/.extraheader (a Git config key)
 #   - internal/github/client_test.go: https://github.com/<owner>/<repo>/pull/<number> (a fix text placeholder)
 #   - internal/markdown/allowlist_test.go: https://example.com (a link in Markdown input)
 #   - internal/draft/mutate_add_test.go: https://:80/x (a reference with no hostname, which validation refuses)
@@ -102,6 +103,7 @@ while IFS= read -r hit; do
 		"internal/gitx/gitx_test.go https://gitlab.com/o/r" | \
 		"internal/gitx/gitx_test.go https://github.com/o" | \
 		"internal/gitx/gitx_test.go https://github.com/.insteadOf" | \
+		"internal/cli/capture_script_test.go https://github.com/.extraheader" | \
 		"internal/github/client_test.go https://github.com/" | \
 		"internal/markdown/allowlist_test.go https://example.com" | \
 		"internal/draft/mutate_add_test.go https://:80/x" | \

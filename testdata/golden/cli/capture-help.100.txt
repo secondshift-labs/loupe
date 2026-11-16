@@ -1,0 +1,107 @@
+Usage
+  loupe capture [<pr-url> | --changed | --files <path>... | --no-files --title <title>] [flags]
+
+Capture a GitHub pull request into a new review round.
+
+Resolves the pull request through the GitHub API, verifies that the clone's origin is the
+pull request's repository, fetches base and head into private refs under refs/loupe/,
+stores the diff and its SHA-256, and creates an empty draft. The working files, index,
+current branch and every other ref of the clone are left untouched.
+
+It also finds the round loupe show --previous will list. An earlier local round with a
+receipt from the same publisher wins. Without one, capture reads the publisher's newest
+loupe review on the pull request back from GitHub, the viewer's own, or with an App token
+a [bot]'s whose source name matches --source, and stores its findings in the run, so loupe
+show --previous answers offline. A review that cannot be read back, or a listing that fails,
+is stored as a reason instead, marked unreadable. That never refuses the capture.
+
+It also reads everyone else's feedback on the pull request for loupe show --comments:
+submitted reviews, inline review threads and top-level comments, every page of each. It
+leaves out loupe's own reviews for this source: a loupe review whose source name, version
+aside, matches --source and whose author is the viewer, or with an App token a [bot]. A
+listing that fails is stored as a reason, never as empty lists.
+
+A closed pull request, merged or not, is refused with pr unless --allow-closed is given.
+With it, capture runs as for an open one. target.prState records the state GitHub
+reported, open or closed, so a reader can tell a closed pull request's run apart.
+
+The clone is --repo, or the working directory.
+
+At most once a day, a capture also looks up loupe's latest release. If it is newer than this
+build, capture warns on stderr and lists update-available in the result's warnings. A lookup
+that fails never refuses the capture. LOUPE_NO_UPDATE_CHECK=1 turns this off.
+
+Result (--json)
+  {"loupe": 1, "ok": true, "command": "capture", "run": "owner/repo#123@1",
+   "dir": "/path/to/run", "version": 0,
+   "target": {"schema": 3, "owner": "owner", "repo": "repo", "number": 123,
+              "url": "https://github.com/owner/repo/pull/123", "title": "...", "author": "...",
+              "viewer": "...", "baseSha": "...", "headSha": "...", "round": 1,
+              "capturedAt": "2026-09-13T12:00:00Z", "clonePath": "/path/to/clone",
+              "baseRef": "refs/loupe/owner/repo/123/1/base", "headRef": "refs/loupe/owner/repo/123/1/head",
+              "mergeBaseSha": "...", "diffSha256": "...", "source": "my-reviewer@1.0.0",
+              "model": "anthropic/claude-sonnet-5", "prState": "open"},
+   "refs": {"base": "refs/loupe/owner/repo/123/1/base", "head": "refs/loupe/owner/repo/123/1/head"},
+   "cleanup": ["git -C /path/to/clone update-ref -d refs/loupe/owner/repo/123/1/base",
+               "git -C /path/to/clone update-ref -d refs/loupe/owner/repo/123/1/head"],
+   "next": ["loupe add --run owner/repo#123@1 --from <file> --json",
+            "loupe summary --run owner/repo#123@1 --from <file> --expect-findings <n> --json",
+            "then the human runs: loupe review owner/repo#123@1"],
+   "previous": {"from": "github", "round": 1, "head": "...",
+                "reviewUrl": "https://github.com/owner/repo/pull/123#pullrequestreview-123", "findingCount": 2},
+   "comments": {"read": true, "reviews": 2, "threads": 1, "comments": 3}}
+  target.previousRound is present from round 2 on; target.source only when --source was given, and target.model only
+  when --model was. previous.from is receipt (with round), github (with round, reviewUrl and findingCount) or none
+  (with reason, and unreadable: true when a loupe review exists but cannot be read back, or the reviews could not be
+  listed). previous.head, the commit the previous round reviewed, is present with receipt or github unless it could
+  not be read back. Run loupe show --previous when it is receipt or github. comments is {read: true} with the three
+  counts, or {read: false, reason}. Run loupe show --comments when read is true. warnings, an array of
+  warning codes, appears only when nonempty.
+
+Local work (apply mode) is captured instead into a local run, local#<n>, whose decisions go back
+to the agent rather than to GitHub. It makes no network call, and warns of a newer release only
+from what an earlier pull request capture found:
+  --changed [--base <ref>]    the worktree's staged, unstaged and untracked changes against HEAD,
+                              or against the merge base with --base, read through a temporary
+                              index so the user's index, refs and files stay untouched
+  --files <path>...           each file whole; repeat --files for more
+  --no-files --title <title>  no file, for findings that are all general
+Each takes --title and --applier, the name of who applies the decisions. Binary, empty, deleted,
+submodule and files over 1 MiB are listed under local.skipped instead of captured.
+
+Result for a local run (--json):
+  {"loupe": 1, "ok": true, "command": "capture", "run": "owner/repo:local#7",
+   "dir": "/path/to/run", "version": 0,
+   "target": {"schema": 3, "kind": "local", "title": "...", "applier": "Claude",
+              "capturedAt": "...", "diffSha256": "...",
+              "local": {"n": 7, "prefix": "owner/repo", "repository": "owner/repo",
+                        "capture": "changed", "root": "/path/to/worktree", "branch": "feat/x",
+                        "baseRef": "main", "mergeBase": "...",
+                        "files": [{"path": "docs/plan.md", "abs": "/path/to/worktree/docs/plan.md"},
+                                  {"path": "notes.txt", "abs": "...", "new": true}],
+                        "skipped": [{"path": "logo.png", "reason": "binary"}]}},
+   "headings": {"docs/plan.md": [{"heading": "Goals", "level": 2, "line": 3}]},
+   "next": ["loupe add --run owner/repo:local#7 --from <file> --json",
+            "loupe handoff --run owner/repo:local#7 --json"]}
+  Anchor findings to local.files[].path. headings lists each captured Markdown file's headings.
+
+Flags
+      --allow-closed[=true|false]   accept a closed or merged pull request; without it capture refuses one with pr
+      --applier string              who will apply a local run's decisions, as the human knows them, at most 64 characters
+      --base string                 with --changed, diff against the merge base of HEAD and this ref instead of HEAD
+      --changed[=true|false]        capture the changed files of the current Git worktree: staged, unstaged and untracked, against HEAD or --base
+      --files stringArray           capture this file whole; repeat for more files
+  -h, --help[=true|false]           help for capture
+      --model string                the model that produces the findings, as you name it, matching ^[a-z0-9][a-z0-9._/:-]*$, at most 64 characters, no --; recorded in the published review's footer and loupe-meta, never required
+      --no-files[=true|false]       capture no file, for findings that are all general; needs --title
+      --repo string                 path to a clone of the pull request's repository (default: the working directory)
+      --source string               the tool filing the findings, as name[@version]; shown in the published review's footer
+      --title string                a local run's title, one line of at most 120 characters
+      --json[=true|false]   print exactly one JSON result object on stdout
+
+Examples
+  loupe capture https://github.com/owner/repo/pull/123 --json
+  loupe capture https://github.com/owner/repo/pull/123 --repo ~/src/repo
+  loupe capture https://github.com/owner/repo/pull/123 --allow-closed --json
+  loupe capture --changed --base main --json
+  loupe capture --files docs/plan.md --applier Claude --json

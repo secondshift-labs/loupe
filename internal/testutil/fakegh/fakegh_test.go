@@ -2,6 +2,7 @@ package fakegh
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -426,5 +427,73 @@ func TestStallLatestReleaseSignalsWhenTheRequestArrives(t *testing.T) {
 	cancel()
 	if err := <-done; err == nil {
 		t.Fatal("a canceled stalled request must fail")
+	}
+}
+
+func getJSON(t *testing.T, s *Server, path string) (int, map[string]any) {
+	t.Helper()
+	resp, err := http.Get(s.URL + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, out
+}
+
+func TestCheckRunsByCommit(t *testing.T) {
+	s := New(t)
+	s.SeedCheckRun("o", "r", "h1", CheckRun{Name: "test", Status: "completed", Conclusion: "success", DetailsURL: "https://github.com/o/r/actions/runs/7/job/1"})
+	s.SeedCheckRun("o", "r", "h1", CheckRun{Name: "lint", Status: "in_progress"})
+	s.SeedCheckRun("o", "r", "h2", CheckRun{Name: "other", Status: "queued"})
+
+	status, got := getJSON(t, s, "/repos/o/r/commits/h1/check-runs?per_page=100")
+	want := map[string]any{"total_count": 2.0, "check_runs": []any{
+		map[string]any{"name": "test", "status": "completed", "conclusion": "success", "details_url": "https://github.com/o/r/actions/runs/7/job/1"},
+		map[string]any{"name": "lint", "status": "in_progress", "conclusion": nil, "details_url": nil},
+	}}
+	if status != 200 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %d %v, want %v", status, got, want)
+	}
+	if _, got := getJSON(t, s, "/repos/o/r/commits/h3/check-runs"); !reflect.DeepEqual(got, map[string]any{"total_count": 0.0, "check_runs": []any{}}) {
+		t.Fatalf("unseeded commit: %v", got)
+	}
+}
+
+func TestWorkflowRunsByHead(t *testing.T) {
+	s := New(t)
+	s.SeedWorkflowRun("o", "r", WorkflowRun{ID: 7, Path: ".github/workflows/review.yml", HeadSHA: "h1"})
+	s.SeedWorkflowRun("o", "r", WorkflowRun{ID: 8, Path: ".github/workflows/ci.yml", HeadSHA: "h1"})
+	s.SeedWorkflowRun("o", "r", WorkflowRun{ID: 9, Path: ".github/workflows/review.yml", HeadSHA: "h2"})
+
+	status, got := getJSON(t, s, "/repos/o/r/actions/runs?head_sha=h1&per_page=100")
+	want := map[string]any{"total_count": 2.0, "workflow_runs": []any{
+		map[string]any{"id": 7.0, "path": ".github/workflows/review.yml", "head_sha": "h1"},
+		map[string]any{"id": 8.0, "path": ".github/workflows/ci.yml", "head_sha": "h1"},
+	}}
+	if status != 200 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %d %v, want %v", status, got, want)
+	}
+	if _, got := getJSON(t, s, "/repos/x/r/actions/runs?head_sha=h1"); got["total_count"] != 0.0 {
+		t.Fatalf("other repository: %v", got)
+	}
+}
+
+func TestPullRequestHeadRepoFullName(t *testing.T) {
+	s := New(t)
+	s.SetPR("o", "r", samplePR())
+	unforked := samplePR()
+	unforked.Number, unforked.HeadOwner, unforked.HeadRepo = 4, "", ""
+	s.SetPR("o", "r", unforked)
+
+	_, got := getJSON(t, s, "/repos/o/r/pulls/3")
+	if repo := got["head"].(map[string]any)["repo"].(map[string]any); repo["full_name"] != "forker/r-fork" {
+		t.Fatalf("head.repo %v", repo)
+	}
+	if _, got := getJSON(t, s, "/repos/o/r/pulls/4"); got["head"].(map[string]any)["repo"] != nil {
+		t.Fatalf("a pull request with no seeded head owner MUST send a null head.repo, as for a deleted fork: %v", got["head"])
 	}
 }

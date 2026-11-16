@@ -1,0 +1,73 @@
+name: loupe capture
+description: Capture a pull request with loupe and lay out review/ for any reviewing agent, or skip the round and say why.
+
+inputs:
+  pull_request:
+    description: Pull request number to review
+    required: true
+  source:
+    description: Source name loupe records and a sticky round finds its review by. It MUST NOT change between rounds.
+    required: true
+  wait_for_checks:
+    description: Minutes to wait for the other checks to settle on an automatic round; 0 turns the wait off
+    required: false
+    default: "10"
+  github-token:
+    description: Read-only token for git and the REST API. It reaches loupe capture alone and is never stored.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  skip:
+    description: true when the round MUST NOT run, false otherwise
+    value: ${{ steps.capture.outputs.skip }}
+  reason:
+    description: fork or already-reviewed when skip is true, else empty
+    value: ${{ steps.capture.outputs.reason }}
+  run:
+    description: The loupe run reference, also exported as LOUPE_RUN
+    value: ${{ steps.capture.outputs.run }}
+  head:
+    description: The captured head commit
+    value: ${{ steps.capture.outputs.head }}
+  review_dir:
+    description: The head's files, pr.diff and checks.json for the agent to read
+    value: ${{ steps.capture.outputs.review_dir }}
+
+runs:
+  using: composite
+  steps:
+    # The default branch, never the pull request: the workspace is where the caller reads its reviewer's instructions
+    # from. Capture asks for the merge base, which a shallow clone cannot answer.
+    - name: Check out the default branch
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        fetch-depth: 0
+        persist-credentials: false
+        token: ${{ inputs.github-token }}
+
+    # From this action's own copy of the repository, so the caller's pin covers the install code and the release.
+    - name: Install loupe
+      shell: bash
+      run: |
+        set -euo pipefail
+        root="$GITHUB_ACTION_PATH/../.."
+        version=$(sed -n 's/^ *default: *\(v[0-9][^ ]*\).*$/\1/p' "$root/action.yml")
+        if [ -z "$version" ]; then
+          echo "::error::no release version in $root/action.yml, so the loupe release this commit shipped is unknown"
+          exit 1
+        fi
+        LOUPE_VERSION="$version" LOUPE_INSTALL_DIR="$RUNNER_TEMP/loupe-bin" LOUPE_NO_PLUGINS=1 sh "$root/install.sh"
+        echo "$RUNNER_TEMP/loupe-bin" >> "$GITHUB_PATH"
+
+    - name: Capture the pull request
+      id: capture
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        LOUPE_CI_PULL_REQUEST: ${{ inputs.pull_request }}
+        LOUPE_CI_SOURCE: ${{ inputs.source }}
+        LOUPE_CI_WAIT_FOR_CHECKS: ${{ inputs.wait_for_checks }}
+        LOUPE_CI_EVENT_ACTION: ${{ github.event.action }}
+      run: sh "$GITHUB_ACTION_PATH/capture.sh"

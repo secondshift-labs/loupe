@@ -112,3 +112,11 @@ Observed on 2026-09-16 in `.github/workflows/review.yml` run 35049778372, on `er
 - `GET /user` was not exercised: capture skips it for an installation token, which is the whole point of the branch. Its 403 remains unobserved.
 - `anthropics/claude-code-action` confines the agent's `Read` to its working directory plus `--add-dir`: a read of `/home/runner/work/loupe/review/head/mise.toml`, one directory above the workspace, was refused as a permission denial. The action's own documentation claims `--add-dir` only grants a directory, so this is stronger than documented and MUST NOT be relied on across versions.
 - An OpenRouter balance too low for the run ends the agent step with `API Error: 402`, `terminal_reason: api_error` and a failed job, after the model has already been billed for the turns it took.
+
+## Reusable workflows and actions from another repository
+
+Observed 2026-11-15 for `specs/058-ci-workflows` item 1, in run 43794012444 on `eriksaulnier/loupe-probe`. A push to a throwaway branch there called workflows and an action in `eriksaulnier/loupe-sandbox`, pinned at commit `2d37ddc`. The caller's commit was `26812a3`. Both branches and the label were deleted afterward.
+
+- 1a. Inside a called workflow, `github.workflow_sha` and the `GITHUB_WORKFLOW_SHA` variable hold the caller's commit (`26812a3`). `job.workflow_sha` holds the called workflow's own commit (`2d37ddc`), and `job.workflow_ref`, `job.workflow_repository` and `job.workflow_file_path` name it. `github.job_workflow_sha` is empty. actionlint 1.7.12 rejects `job.workflow_sha` but accepts `toJSON(job)`, which carries it, so `publish.yml` reads it from there.
+- 1b. An action used from a subdirectory of another repository at a SHA gets the whole repository. `$GITHUB_ACTION_PATH` was `.../_actions/eriksaulnier/loupe-sandbox/2d37ddc.../probe/sub`, and `$GITHUB_ACTION_PATH/../..` held the repository's root files, including `.github/workflows/`. `ci/capture` installs loupe from there.
+- 1c. A write permission granted by the caller reaches a job two reusable workflows down when each call grants it. The caller granted `pull-requests: write` to workflow A, A granted it to workflow B, and B's job added and removed a label on `eriksaulnier/loupe-probe#1`.

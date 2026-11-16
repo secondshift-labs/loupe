@@ -122,6 +122,7 @@ func TestStickyRoundReadsTheReviewsCurrentRound(t *testing.T) {
 func TestLocalReceiptWinsOverTheReviews(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
+	head := h.Repo.HeadSHA()
 	h.captureRound(1)
 	h.publishRound(1)
 	h.pushHead("src/round2.go")
@@ -130,8 +131,8 @@ func TestLocalReceiptWinsOverTheReviews(t *testing.T) {
 	if got := h.reviewLists() - lists; got != 1 {
 		t.Fatalf("capture after a local receipt listed the reviews %d times, want 1", got)
 	}
-	if p := previousOf(t, env); p["from"] != "receipt" || fmt.Sprint(p["round"]) != "1" || len(p) != 2 {
-		t.Fatalf("capture previous %v, want {from: receipt, round: 1}", p)
+	if p := previousOf(t, env); p["from"] != "receipt" || fmt.Sprint(p["round"]) != "1" || p["head"] != head || len(p) != 3 {
+		t.Fatalf("capture previous %v, want {from: receipt, round: 1, head: %s}", p, head)
 	}
 	if shown := h.mustOK("show", "--previous", "--run", roundRef(2)); shown["from"] != "receipt" {
 		t.Fatalf("show --previous %v", shown)

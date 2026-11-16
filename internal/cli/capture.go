@@ -74,13 +74,14 @@ Result (--json):
    "next": ["loupe add --run owner/repo#123@1 --from <file> --json",
             "loupe summary --run owner/repo#123@1 --from <file> --expect-findings <n> --json",
             "then the human runs: loupe review owner/repo#123@1"],
-   "previous": {"from": "github", "round": 1,
+   "previous": {"from": "github", "round": 1, "head": "...",
                 "reviewUrl": "https://github.com/owner/repo/pull/123#pullrequestreview-123", "findingCount": 2},
    "comments": {"read": true, "reviews": 2, "threads": 1, "comments": 3}}
   target.previousRound is present from round 2 on; target.source only when --source was given, and target.model only
   when --model was. previous.from is receipt (with round), github (with round, reviewUrl and findingCount) or none
   (with reason, and unreadable: true when a loupe review exists but cannot be read back, or the reviews could not be
-  listed). Run loupe show --previous when it is receipt or github. comments is {read: true} with the three
+  listed). previous.head, the commit the previous round reviewed, is present with receipt or github unless it could
+  not be read back. Run loupe show --previous when it is receipt or github. comments is {read: true} with the three
   counts, or {read: false, reason}. Run loupe show --comments when read is true. warnings, an array of
   warning codes, appears only when nonempty.
 
@@ -411,7 +412,11 @@ func checkForUpdate(ctx context.Context, deps Deps, client github.Client, root s
 func capturePrevious(root string, ref run.Ref, reviews []github.Review, listErr error, viewer, source string) (map[string]any, []byte, error) {
 	round, _, err := publish.PreviousReceipt(root, ref, viewer, source)
 	if err == nil {
-		return map[string]any{"from": "receipt", "round": round}, nil, nil
+		previous := map[string]any{"from": "receipt", "round": round}
+		if target, err := run.LoadTarget(run.RunDir(root, ref.Owner, ref.Repo, ref.Number, round)); err == nil && target.HeadSHA != "" {
+			previous["head"] = target.HeadSHA
+		}
+		return previous, nil, nil
 	}
 	if r, ok := refusal.As(err); !ok || r.Code != refusal.NotFound {
 		return nil, nil, err
@@ -427,7 +432,11 @@ func capturePrevious(root string, ref run.Ref, reviews []github.Review, listErr 
 	if !p.Found {
 		return map[string]any{"from": "none", "reason": p.Reason}, data, nil
 	}
-	return map[string]any{"from": "github", "round": p.Round, "reviewUrl": p.ReviewURL, "findingCount": len(p.Findings)}, data, nil
+	previous := map[string]any{"from": "github", "round": p.Round, "reviewUrl": p.ReviewURL, "findingCount": len(p.Findings)}
+	if p.Commit != "" {
+		previous["head"] = p.Commit
+	}
+	return previous, data, nil
 }
 
 // refuseSameHead runs under the capture lock so two captures at an unchanged head cannot both pass it. A published

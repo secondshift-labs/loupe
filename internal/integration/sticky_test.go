@@ -77,6 +77,28 @@ func TestPublishStickyUnattendedKeepsOneReview(t *testing.T) {
 	}
 }
 
+// Round 2 names the head round 1 reviewed whether it reads round 1 from a receipt in the same data root or, as CI does
+// from a fresh one, back from GitHub (specs/058-ci-workflows).
+func TestStickyRoundReportsThePreviousRoundsHead(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.UseInstallationToken()
+	h.GH.SetViewer("github-actions[bot]")
+	_, head := h.ciRound(true, oneFinding, nil)
+	h.pushHead("src/round2.go")
+	for _, c := range []struct {
+		from  string
+		fresh bool
+	}{{"receipt", false}, {"github", true}} {
+		if c.fresh {
+			h.Home = filepath.Join(t.TempDir(), "home")
+		}
+		if p := previousOf(t, h.capture("--source", "ci-review")); p["from"] != c.from || p["head"] != head {
+			t.Fatalf("capture previous %v, want from %s with head %s", p, c.from, head)
+		}
+	}
+}
+
 // A pipeline passes the same --note every round. The review shows it once, on the newest round, and each round still
 // reads the one before it back from GitHub.
 func TestPublishStickyNoteShowsOnlyOnTheNewestRound(t *testing.T) {

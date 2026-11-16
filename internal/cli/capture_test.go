@@ -12,6 +12,7 @@ import (
 
 	"github.com/secondshift-labs/loupe/internal/github"
 	"github.com/secondshift-labs/loupe/internal/refusal"
+	"github.com/secondshift-labs/loupe/internal/render"
 	"github.com/secondshift-labs/loupe/internal/run"
 	"github.com/secondshift-labs/loupe/internal/testutil/fakegh"
 	"github.com/secondshift-labs/loupe/internal/testutil/gitfail"
@@ -246,6 +247,78 @@ func TestCaptureLinesNameWhereThePreviousRoundAndCommentsCameFrom(t *testing.T) 
 	}
 	if got := commentsLine(map[string]any{"read": false, "reason": "GitHub answered 502"}); got != "not read; GitHub answered 502" {
 		t.Errorf("commentsLine = %q", got)
+	}
+}
+
+// reviewerBody is a round reviewer published at head abc1234, with one finding.
+func reviewerBody(sticky *render.StickyInput) string {
+	return render.Body(render.Input{Owner: "o", Repo: "r", Number: 1, Round: 2, HeadSHA: "abc1234", Inline: "none",
+		Digest: "d", PublicationID: "p", Sticky: sticky,
+		Findings: []render.Finding{{ID: "f-001", Title: "T", Body: "Body.", Label: "issue",
+			Location: &render.Location{Path: "a.go", Side: "RIGHT", Line: 3}}}})
+}
+
+func TestCapturePreviousReportsTheHeadTheRoundReviewed(t *testing.T) {
+	first, rounds, err := render.ReadSticky(reviewerBody(&render.StickyInput{Rounds: 1}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unreadable := reviewerBody(&render.StickyInput{Rounds: 2, Earlier: []render.Round{{N: 1, Commit: "abc1234",
+		Anchor: "<!-- loupe-round v=9 n=1 commit=abc1234 sum=00 -->", Block: "<details>\n<summary>Round 1</summary>\n\nold\n\n</details>"}}})
+	if _, _, err := render.ReadSticky(unreadable); err == nil {
+		t.Fatal("the unreadable sticky body reads back, so it proves nothing")
+	}
+	review := func(body string) []github.Review {
+		return []github.Review{{ID: 5, User: "reviewer", State: "COMMENTED", Body: body, CommitID: "c0ffee0",
+			HTMLURL: "https://github.com/o/r/pull/1#pullrequestreview-5"}}
+	}
+	ref := run.Ref{Owner: "o", Repo: "r", Number: 1, Round: 2}
+	for _, c := range []struct {
+		name, from, want string
+		reviews          []github.Review
+	}{
+		{"github", "github", "c0ffee0", review(reviewerBody(nil))},
+		// An edited review keeps the commit_id of the round that created it, so the head comes from the body.
+		{"sticky", "github", "abc1234", review(reviewerBody(&render.StickyInput{Rounds: rounds + 1, Earlier: first}))},
+		{"sticky body not read back", "github", "", review(unreadable)},
+		{"none", "none", "", nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, _, err := capturePrevious(t.TempDir(), ref, c.reviews, nil, "reviewer", "")
+			wantPreviousHead(t, got, err, c.from, c.want)
+		})
+	}
+
+	t.Run("receipt", func(t *testing.T) {
+		home := assessRun(t, "pub-1")
+		dir := run.RunDir(home, "o", "r", 1, 1)
+		target, err := run.LoadTarget(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target.HeadSHA = "1111111"
+		if err := run.WriteJSONAtomic(filepath.Join(dir, "target.json"), target); err != nil {
+			t.Fatal(err)
+		}
+		got, _, err := capturePrevious(home, ref, nil, nil, "reviewer", "")
+		wantPreviousHead(t, got, err, "receipt", "1111111")
+	})
+	t.Run("receipt round's target not loaded", func(t *testing.T) {
+		home := assessRun(t, "pub-1")
+		if err := os.WriteFile(filepath.Join(run.RunDir(home, "o", "r", 1, 1), "target.json"), []byte("{"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got, _, err := capturePrevious(home, ref, nil, nil, "reviewer", "")
+		wantPreviousHead(t, got, err, "receipt", "")
+	})
+}
+
+// wantPreviousHead checks that previous came from from, with head want, or with no head when want is empty.
+func wantPreviousHead(t *testing.T, previous map[string]any, err error, from, want string) {
+	t.Helper()
+	head, ok := previous["head"]
+	if err != nil || previous["from"] != from || ok != (want != "") || (ok && head != want) {
+		t.Fatalf("previous %v err %v, want from %s with head %q", previous, err, from, want)
 	}
 }
 

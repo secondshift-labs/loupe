@@ -10,7 +10,7 @@
 
 loupe publishes a review agent's findings as one GitHub review in a fixed format: findings in sections, severity pills, and sticky rounds that edit one review per pull request in place. In GitHub Actions, the only packaged way to get that format today is `eriksaulnier/loupe-workflows`, a reusable workflow that bundles capture, a Claude reviewer and publish into one unit.
 
-This spec splits the bundle. loupe ships three pieces: a `ci/capture` composite action, a `ci/save` composite action, and a reusable workflow, `publish.yml`. A caller runs `ci/capture`, then its own agent, then `ci/save`, in one review job, and calls `publish.yml` as a second job. The agent can be any agent with a shell that can run `loupe`. loupe ships no reviewer, as Principle I requires. `loupe-workflows` moves to `secondshift-labs` and becomes the reference Claude reviewer, rebuilt on these pieces.
+This spec splits the bundle. loupe ships three pieces: a `ci/capture` composite action, a `ci/save` composite action, and a reusable workflow, `publish.yml`. A caller runs `ci/capture`, then its own agent, then `ci/save`, in one review job, and calls `publish.yml` as a second job. The agent can be any agent with a shell that can run `loupe`. loupe ships no reviewer, as Principle I requires. `loupe-workflows` moves to `secondshift-labs` as `ai-review-workflows` and becomes the reference Claude reviewer, rebuilt on these pieces. The name says what the repository holds, reusable workflows for AI review, without naming a model or suggesting that loupe ships a reviewer.
 
 This spec covers loupe's side at file level. The work in `loupe-workflows` and in the three repositories that call it is a migration section, because those files live and release elsewhere.
 
@@ -81,7 +81,7 @@ The goal is to share loupe's review format and organization, not a particular re
 ### CUJ 4: The owner's repositories move without a second review
 
 *   **Given**: loupe, market-map and pickle-watch call the old `eriksaulnier/loupe-workflows`, and pull requests are open with loupe reviews.
-*   **When**: Each caller pins `source` to the name its reviews already carry, then bumps to the rebuilt `secondshift-labs/loupe-workflows`.
+*   **When**: Each caller pins `source` to the name its reviews already carry, then bumps to the rebuilt `secondshift-labs/ai-review-workflows`.
 *   **Then**: The next round on each open pull request finds its existing review by that name. No pull request gets a second loupe review from the same series.
 
 ## How
@@ -362,7 +362,7 @@ Items run in this order. Item 1 comes first because each of its three answers ca
 #### 15. `docs/ci-action.md` (Modify)
 
 *   **Type / Scope**: Docs.
-*   **Proposed Changes**: Replace "The shared review workflow" (from line 50 up to "GitHub's behavior" at line 59) with "Reusable pieces". It holds the starter file below, a numbered setup list, a "you bring, loupe gives" table, the `source` warning (pin it before moving, never rename it, because a sticky round finds its review by that name), why permissions are granted per job, and the agent's contract: read `review/`, follow `loupe show --help`. It links `secondshift-labs/loupe-workflows` as the reference Claude reviewer. The starter file, with `<sha>` and `vX.Y.Z` filled in at release:
+*   **Proposed Changes**: Replace "The shared review workflow" (from line 50 up to "GitHub's behavior" at line 59) with "Reusable pieces". It holds the starter file below, a numbered setup list, a "you bring, loupe gives" table, the `source` warning (pin it before moving, never rename it, because a sticky round finds its review by that name), why permissions are granted per job, and the agent's contract: read `review/`, follow `loupe show --help`. It links `secondshift-labs/ai-review-workflows` as the reference Claude reviewer. The starter file, with `<sha>` and `vX.Y.Z` filled in at release:
 
 ```yaml
 name: review
@@ -476,10 +476,11 @@ jobs:
 Done after the loupe release that ships items 2-19, in this order.
 
 1.  **Pin `source` in every caller.** market-map and pickle-watch set `source:` to the name in their reviews' hidden `loupe-meta` line (`src=`). loupe's caller pins `loupe-ci` (`.github/workflows/review.yml:40-43`).
-2.  **Transfer `eriksaulnier/loupe-workflows` to `secondshift-labs`.** In that repository, update its README's links.
+2.  **Transfer `eriksaulnier/loupe-workflows` to `secondshift-labs` and rename it `ai-review-workflows`.** GitHub redirects the old name. In that repository, update its README's links.
 3.  **Rebuild `loupe-workflows` as v3.0.0.** Its `review.yml` becomes a review job (`ci/capture`, the Claude step with its prompt, model, provider, `max_turns`, instructions file, coverage line and trace upload, `ci/save`), a call to loupe's `publish.yml`, and an `unlabel` job. `source` becomes required. Its draft, bot and release-branch skips move into its review job's `if:`, so its callers keep today's behavior. Its `sticky` default stays `false`. If item 1c failed, use that item's fallback shape instead.
 4.  **Try it on `loupe-probe#1`**: two sticky rounds, then a rollback to the old pin. **Pass**: round 2 edits round 1's review, and the old pin's next round still edits it.
-5.  **Move each caller's pin** to `secondshift-labs/loupe-workflows@<sha> # v3.0.0`. loupe moves last, since its own reviews check every later loupe change.
+5.  **Move each caller's pin** to `secondshift-labs/ai-review-workflows@<sha> # v3.0.0`. loupe moves last, since its own reviews check every later loupe change.
+6.  **Add one-click setup for the organization's repositories.** Create `secondshift-labs/.github` with `workflow-templates/ai-review.yml`, the short caller of `ai-review-workflows` at its v3.0.0 release SHA with `source` and the model left for the repository owner to fill in, and its `ai-review.properties.json`. A template is copied when a repository adds it, so later releases reach those copies through Dependabot, not the template.
 
 ### Verification Plan
 

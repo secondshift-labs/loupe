@@ -134,3 +134,16 @@ func TestCapturePieceCarriesNoVersion(t *testing.T) {
 		}
 	}
 }
+
+// Inside a called workflow, github.workflow_sha is the caller's commit and job.workflow_sha is the called workflow's
+// own (docs/github-facts.md, 2026-11-15). Checking loupe out at the caller's commit would fail or install the wrong
+// release.
+func TestPublishWorkflowReadsItsOwnCommit(t *testing.T) {
+	text := readRepoFile(t, ".github/workflows/publish.yml")
+	if strings.Contains(text, "github.workflow_sha") {
+		t.Error("publish.yml MUST NOT read github.workflow_sha, which names the caller's commit")
+	}
+	if !strings.Contains(text, "${{ toJSON(job) }}") || !strings.Contains(text, ".workflow_sha") {
+		t.Error("publish.yml MUST read its own commit from the job context's workflow_sha")
+	}
+}

@@ -56,9 +56,7 @@ The goal is to share loupe's review format and organization, not a particular re
 ## Open Questions
 
 *   **Is `loupe-workflows` a second concrete use?** Principle VI asks for a second concrete use before an abstraction. `loupe-workflows` consumes the pieces as a separate repository, and loupe's own CI consumes it. No outside user exists yet. This spec proceeds on the owner's goal of outside adoption and records the departure in Complexity Tracking.
-*   **Can `publish.yml` read its own commit at run time?** The install design below needs it. The first step of the work is a probe that answers it (Implementation item 1).
-*   **Does an action in a subdirectory get the whole repository?** `ci/capture` installs loupe from `$GITHUB_ACTION_PATH/../..`. The same probe answers it.
-*   **How do permissions cap across levels?** `loupe-workflows` calls loupe's `publish.yml` from inside its own reusable workflow, so the publish job sits two levels below the owner's callers. The same probe checks that it still gets `pull-requests: write`.
+*   **The platform questions are answered.** The probe (Implementation item 1) ran on 2026-11-15, and all three questions passed. `docs/github-facts.md` records the results.
 
 ## Critical User Journeys (CUJs)
 
@@ -145,7 +143,7 @@ It is the old workflow's `publish` job, with these changes: it installs loupe fr
 *   **Inputs**: `pull_request` (required), `source` (required), `sticky` (boolean, default `false`, as in the old workflow), `note` (default empty).
 *   **Permissions**: `contents: read`, `pull-requests: write`. It runs no caller step and checks out nothing from the pull request (FR-030).
 *   **Concurrency**: the job-level group `loupe-publish-<pr>-<source>`, `cancel-in-progress: false`.
-*   **Install.** It reads its own commit at run time (probe, item 1), checks out only `action.yml` from `secondshift-labs/loupe` at that commit into `.loupe/`, and runs it as the local action `./.loupe`. That installs the release the caller pinned, with no version string in `publish.yml`. Fallback if the probe fails: release-please gets a token with `workflows` permission, and `publish.yml` carries a stamped `uses: secondshift-labs/loupe@v<version> # x-release-please-version`.
+*   **Install.** It reads its own commit from `job.workflow_sha`, through `toJSON(job)` because actionlint 1.7.12 does not know the field (`github.workflow_sha` is the caller's commit, item 1a), checks out only `action.yml` from `secondshift-labs/loupe` at that commit into `.loupe/`, and runs it as the local action `./.loupe`. That installs the release the caller pinned, with no version string in `publish.yml`.
 *   **Rerun guard.** When `github.run_attempt` is above 1, the job refuses, because an earlier attempt may have posted and nothing this job can trust records whether it did. An artifact could, but the review job, which runs the agent, can upload one under any name. The way back is a fresh round. On attempt 1 it downloads the `-reviewed` artifact.
 *   **Trust check.** The `-reviewed` artifact was written by a job that ran an agent on untrusted pull request text. Before publishing, it reads the run with `loupe show --run <ref> --json` and refuses unless `target.owner/target.repo` is `github.repository`, `target.number` is `pull_request` and `target.source` is `source`. Everything else in the run, such as the findings and the summary, is the reviewer's output and is published as such. loupe's Markdown allowlist (`docs/comment-format.md`) applies to it.
 *   **Publish.** `loupe publish <ref> --unattended --json`, plus `--sticky` and `--note` when set. A result with `replayed: true` fails the job, since this job restores no receipt of its own and a replay means the restored run carried one. `review_url` is written only when it matches `https://github.com/<repo>/pull/<n>#pullrequestreview-<id>`. It uploads the data root as `loupe-<pr>-<source>-published` with `if: always()`, as evidence that nothing reads back.
@@ -159,7 +157,7 @@ It is the old workflow's `publish` job, with these changes: it installs loupe fr
 
 ### Versioning
 
-`ci/capture` and `publish.yml` each install the release that matches their own commit, as described above. `ci/save` installs nothing. A caller pins all three by the same release SHA, so Dependabot moves them together. Only the root `action.yml` carries a stamped version, as today, and release-please stamps nothing new. The fallback in `publish.yml` adds one stamped file under `.github/workflows/`.
+`ci/capture` and `publish.yml` each install the release that matches their own commit, as described above. `ci/save` installs nothing. A caller pins all three by the same release SHA, so Dependabot moves them together. Only the root `action.yml` carries a stamped version, as today, and release-please stamps nothing new.
 
 ### Moving existing callers (G6)
 
@@ -197,7 +195,6 @@ The prompt, the model and provider inputs, `max_turns`, the instructions file, t
 *   **Two rounds at the same head.** Two requests in quick succession both run, spend two model runs, and edit the same sticky review twice. The starter's workflow-level concurrency group queues them. Without it, the publish job's group still serializes the posts, and `loupe publish` refuses a stale round with `head-moved` when the head has moved.
 *   **A rerun cannot publish.** "Re-run failed jobs" makes attempt 2, and publish refuses every attempt after the first. The fix is a fresh round by the label, as today. Safe reruns are a Future Improvement.
 *   **Size.** The artifact is the data root: the diff and the run's JSON files. It grows with the diff, not the repository. A diff past the artifact size limit fails the upload, and the step fails. No limit beyond GitHub's own applies.
-*   **The probe fails.** If `publish.yml` cannot read its own commit, the fallback adds a release token. If an action in a subdirectory does not get the whole repository, `ci/capture` installs through a stamped `uses: secondshift-labs/loupe@v<version>` instead, a tag that can move after release.
 
 ## Alternatives Considered
 
@@ -286,7 +283,7 @@ Items run in this order. Item 1 comes first because each of its three answers ca
 *   **1a. Can a called workflow read its own commit?** A caller calls a reusable workflow in another repository by SHA. The called job prints every `github` and `job` context field that names a workflow ref or SHA, such as `github.workflow_sha`, `github.job_workflow_sha` and `job.workflow_sha`. **Pass**: one field equals the SHA the caller pinned. **Fallback on fail**: item 11 installs with `uses: secondshift-labs/loupe@v<version> # x-release-please-version`. `release-please-config.json` adds `.github/workflows/publish.yml` as a `generic` extra-file. `.github/workflows/release.yml` passes `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}` to release-please, a fine-grained token with contents, pull-requests and workflows write that the owner creates. `TestInstallAction` (`internal/cli/action_test.go:10`) also requires the marker in `publish.yml`.
 *   **1b. Does an action in a subdirectory get the whole repository?** A job uses an action from a subdirectory of another repository at a SHA and lists `$GITHUB_ACTION_PATH/../..`. **Pass**: `action.yml` and `install.sh` are there. **Fallback on fail**: `ci/capture`'s install step becomes `uses: secondshift-labs/loupe@v<version> # x-release-please-version`, a tag that can move after release. `release-please-config.json` adds `ci/capture/action.yml` as a `generic` extra-file. Item 12's `TestCapturePieceCarriesNoVersion` becomes a stamp test for that file, in the style of `TestInstallAction`.
 *   **1c. Does the write permission reach two levels below the caller?** A caller calls reusable workflow A, granting `pull-requests: write` on that call. A calls reusable workflow B, granting `pull-requests: write` on its call. A job in B adds and removes a label. **Pass**: the label call succeeds. **Fallback on fail**: no loupe file changes. Migration step 3 changes instead: `loupe-workflows` ships its Claude review job as a composite action, and its callers call loupe's `publish.yml` directly as their second job.
-*   **Recording**: results go into `docs/github-facts.md` (item 16) with the date.
+*   **Result**: run 2026-11-15, all three passed, so no fallback applies. `docs/github-facts.md` (item 16) records the results.
 
 ### Binary
 

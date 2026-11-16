@@ -56,12 +56,14 @@ jobs:
       LOUPE_RUN: ${{ github.repository }}#${{ inputs.pull_request }}
     steps:
       # The commit this workflow runs from, so the install below is the release the caller pinned, with no version
-      # string in this file.
+      # string in this file. In a called workflow the github context's workflow_sha is the caller's commit and the
+      # job's is this file's own. It is read through toJSON(job) because actionlint 1.7.12 does not know the field.
       - name: Read this workflow's own commit
         id: own
         env:
-          OWN_SHA: ${{ github.workflow_sha }}
+          JOB_CONTEXT: ${{ toJSON(job) }}
         run: |
+          OWN_SHA=$(jq -r '.workflow_sha // ""' <<<"$JOB_CONTEXT")
           if ! [[ "$OWN_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::could not read the commit this publish workflow runs from (got '$OWN_SHA'), so the loupe release to install is unknown"
             exit 1

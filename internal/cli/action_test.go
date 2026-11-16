@@ -147,3 +147,21 @@ func TestPublishWorkflowReadsItsOwnCommit(t *testing.T) {
 		t.Error("publish.yml MUST read its own commit from the job context's workflow_sha")
 	}
 }
+
+// A job with no timeout runs for GitHub's default of 6 hours when an API call or an agent hangs.
+func TestCIJobsHaveTimeouts(t *testing.T) {
+	text := readRepoFile(t, ".github/workflows/publish.yml")
+	if !strings.Contains(text, "timeout-minutes:") {
+		t.Error("publish.yml's publish job MUST set timeout-minutes")
+	}
+	doc := readRepoFile(t, "docs/ci-action.md")
+	start := strings.Index(doc, "name: review\n")
+	if start < 0 {
+		t.Fatal("docs/ci-action.md has no starter file")
+	}
+	starter := doc[start:]
+	starter = starter[:strings.Index(starter, "```")]
+	if n := strings.Count(starter, "timeout-minutes:"); n != 2 {
+		t.Errorf("the starter file sets timeout-minutes on %d jobs, want 2 (review and unlabel)", n)
+	}
+}

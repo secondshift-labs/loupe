@@ -92,6 +92,8 @@ jobs:
        !startsWith(github.head_ref, 'release-please--') &&
        !endsWith(github.event.pull_request.user.login, '[bot]'))
     runs-on: ubuntu-latest
+    # Up to 10 minutes of waiting for checks, plus the agent's own time.
+    timeout-minutes: 30
     # On the job, not the workflow: only runs that pass the if above take a place, so an unrelated label cannot
     # cancel a round that is waiting its turn.
     concurrency:
@@ -138,6 +140,7 @@ jobs:
       always() && github.event.action == 'labeled' && github.event.label.name == 'ai-review' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       pull-requests: write
     steps:

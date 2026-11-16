@@ -36,6 +36,8 @@ permissions: {}
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Publishing is a handful of API calls, so a longer run is a hang.
+    timeout-minutes: 10
     # A called workflow's permissions are capped by the calling job's, so the caller MUST grant these on its call.
     permissions:
       # No checkout of the caller here, but a private repository caps its REST reads on this scope too.

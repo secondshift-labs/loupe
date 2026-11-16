@@ -413,7 +413,7 @@ func capturePrevious(root string, ref run.Ref, reviews []github.Review, listErr 
 	round, _, err := publish.PreviousReceipt(root, ref, viewer, source)
 	if err == nil {
 		previous := map[string]any{"from": "receipt", "round": round}
-		if target, err := run.LoadTarget(run.RunDir(root, ref.Owner, ref.Repo, ref.Number, round)); err == nil {
+		if target, err := run.LoadTarget(run.RunDir(root, ref.Owner, ref.Repo, ref.Number, round)); err == nil && target.HeadSHA != "" {
 			previous["head"] = target.HeadSHA
 		}
 		return previous, nil, nil

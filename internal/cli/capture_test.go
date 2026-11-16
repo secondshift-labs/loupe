@@ -303,6 +303,20 @@ func TestCapturePreviousReportsTheHeadTheRoundReviewed(t *testing.T) {
 		got, _, err := capturePrevious(home, ref, nil, nil, "reviewer", "")
 		wantPreviousHead(t, got, err, "receipt", "1111111")
 	})
+	t.Run("receipt round's target has no head", func(t *testing.T) {
+		home := assessRun(t, "pub-1")
+		dir := run.RunDir(home, "o", "r", 1, 1)
+		target, err := run.LoadTarget(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target.HeadSHA = ""
+		if err := run.WriteJSONAtomic(filepath.Join(dir, "target.json"), target); err != nil {
+			t.Fatal(err)
+		}
+		got, _, err := capturePrevious(home, ref, nil, nil, "reviewer", "")
+		wantPreviousHead(t, got, err, "receipt", "")
+	})
 	t.Run("receipt round's target not loaded", func(t *testing.T) {
 		home := assessRun(t, "pub-1")
 		if err := os.WriteFile(filepath.Join(run.RunDir(home, "o", "r", 1, 1), "target.json"), []byte("{"), 0o644); err != nil {

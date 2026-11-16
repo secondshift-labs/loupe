@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/secondshift-labs/loupe/compare/v0.24.2...v0.25.0) (2026-11-16)
+
+
+### Features
+
+* ship ci/capture, ci/save and publish.yml for any reviewer ([#149](https://github.com/secondshift-labs/loupe/issues/149)) ([9fb8652](https://github.com/secondshift-labs/loupe/commit/9fb8652bde4e0c3b8fc941b2d35277ec9b581a8a))
+
 ## [0.24.2](https://github.com/secondshift-labs/loupe/compare/v0.24.1...v0.24.2) (2026-11-13)
 
 

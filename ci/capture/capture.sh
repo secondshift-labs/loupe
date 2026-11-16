@@ -35,6 +35,24 @@ api() {
 		"$GITHUB_API_URL/$1"
 }
 
+# Every page of a list endpoint, as one JSON array of the items under $2. GitHub caps a page at 100.
+api_all() {
+	page=1
+	items='[]'
+	while :; do
+		body=$(api "$1&per_page=100&page=$page") || return 1
+		items=$(printf '%s' "$body" | jq -c --argjson acc "$items" --arg key "$2" '$acc + .[$key]')
+		got=$(printf '%s' "$items" | jq length)
+		listed=$(printf '%s' "$body" | jq '.total_count')
+		new=$(printf '%s' "$body" | jq --arg key "$2" '.[$key] | length')
+		if [ "$got" -ge "$listed" ] || [ "$new" -eq 0 ]; then
+			break
+		fi
+		page=$((page + 1))
+	done
+	printf '%s' "$items"
+}
+
 skip() {
 	echo "Skipping the review of $repo#$pr: $1 ($2)."
 	printf 'loupe skipped the review of %s#%s (%s): %s\n' "$repo" "$pr" "$1" "$2" >>"$GITHUB_STEP_SUMMARY"
@@ -81,13 +99,13 @@ fi
 # out of both the wait and checks.json.
 workflow=${GITHUB_WORKFLOW_REF#"$repo"/}
 workflow=${workflow%%@*}
-runs=$(api "repos/$repo/actions/runs?head_sha=$head&per_page=100")
+runs=$(api_all "repos/$repo/actions/runs?head_sha=$head" workflow_runs)
 own=$(printf '%s' "$runs" |
-	jq -c --arg path "$workflow" '[.workflow_runs[] | select((.path | sub("@.*$"; "")) == $path) | .id]')
+	jq -c --arg path "$workflow" '[.[] | select((.path | sub("@.*$"; "")) == $path) | .id]')
 
 others() {
-	check_runs=$(api "repos/$repo/commits/$head/check-runs?per_page=100") || return 1
-	printf '%s' "$check_runs" | jq -c --argjson own "$own" '[.check_runs[]
+	check_runs=$(api_all "repos/$repo/commits/$head/check-runs?filter=latest" check_runs) || return 1
+	printf '%s' "$check_runs" | jq -c --argjson own "$own" '[.[]
 		| select((.details_url // "") as $u | $own | any(. as $id | $u | contains("/actions/runs/\($id)/")) | not)]'
 }
 
@@ -102,10 +120,10 @@ if [ "$automatic" = true ] && [ "$LOUPE_CI_WAIT_FOR_CHECKS" -gt 0 ]; then
 			break
 		fi
 		now=$(date +%s)
-		total=$(printf '%s' "$checks" | jq length)
 		pending=$(printf '%s' "$checks" | jq '[.[] | select(.status != "completed")] | length')
-		# Other workflows often have not registered a check run yet, and an empty first poll is not "all finished".
-		if [ "$total" -eq 0 ] && [ "$now" -lt $((start + grace)) ]; then
+		# Slower workflows often have not registered a check run yet, so nothing counts as "all finished" before the
+		# grace has passed.
+		if [ "$pending" -eq 0 ] && [ "$now" -lt $((start + grace)) ]; then
 			sleep "$poll"
 			continue
 		fi

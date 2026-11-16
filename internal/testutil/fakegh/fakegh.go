@@ -965,12 +965,13 @@ func (s *Server) listCheckRuns(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	all := s.checkRuns[commitKey{r.PathValue("owner"), r.PathValue("repo"), r.PathValue("sha")}]
 	s.mu.Unlock()
-	out := make([]any, 0, len(all))
-	for _, c := range all {
+	start, end := s.restPage(w, r, len(all))
+	out := make([]any, 0, end-start)
+	for _, c := range all[start:end] {
 		out = append(out, map[string]any{"name": c.Name, "status": c.Status, "conclusion": nullable(c.Conclusion),
 			"details_url": nullable(c.DetailsURL)})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(out), "check_runs": out})
+	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(all), "check_runs": out})
 }
 
 func (s *Server) listWorkflowRuns(w http.ResponseWriter, r *http.Request) {
@@ -978,13 +979,18 @@ func (s *Server) listWorkflowRuns(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	all := s.workflowRuns[repoKey{r.PathValue("owner"), r.PathValue("repo")}]
 	s.mu.Unlock()
-	out := make([]any, 0, len(all))
+	var matched []WorkflowRun
 	for _, run := range all {
 		if head == "" || run.HeadSHA == head {
-			out = append(out, map[string]any{"id": run.ID, "path": run.Path, "head_sha": run.HeadSHA})
+			matched = append(matched, run)
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(out), "workflow_runs": out})
+	start, end := s.restPage(w, r, len(matched))
+	out := make([]any, 0, end-start)
+	for _, run := range matched[start:end] {
+		out = append(out, map[string]any{"id": run.ID, "path": run.Path, "head_sha": run.HeadSHA})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(matched), "workflow_runs": out})
 }
 
 func nullable(s string) any {

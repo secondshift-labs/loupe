@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/secondshift-labs/loupe/internal/gitenv"
 	"github.com/secondshift-labs/loupe/internal/github"
@@ -305,6 +306,45 @@ func TestCaptureScriptWaitsForOtherChecksOnly(t *testing.T) {
 	want := []map[string]any{{"name": "test", "conclusion": "success"}, {"name": "codecov", "conclusion": "failure"}}
 	if got, _ := json.Marshal(checks); string(got) != mustJSON(t, want) {
 		t.Errorf("checks.json %s, want %s", got, mustJSON(t, want))
+	}
+}
+
+// GitHub lists at most 100 check runs or workflow runs a page, so a busy commit spills onto later pages.
+func TestCaptureScriptReadsEveryPage(t *testing.T) {
+	f := newCaptureFixture(t)
+	f.gh.SetPageSize(1)
+	head := f.repo.HeadSHA()
+	f.gh.SeedWorkflowRun("o", "r", fakegh.WorkflowRun{ID: 8, Path: ".github/workflows/ci.yml", HeadSHA: head})
+	f.gh.SeedWorkflowRun("o", "r", fakegh.WorkflowRun{ID: 7, Path: ".github/workflows/review.yml", HeadSHA: head})
+	f.gh.SeedCheckRun("o", "r", head, fakegh.CheckRun{Name: "test", Status: "completed", Conclusion: "success",
+		DetailsURL: "https://github.com/o/r/actions/runs/8/job/80"})
+	f.gh.SeedCheckRun("o", "r", head, fakegh.CheckRun{Name: "review / review", Status: "completed", Conclusion: "success",
+		DetailsURL: "https://github.com/o/r/actions/runs/7/job/70"})
+	f.gh.SeedCheckRun("o", "r", head, fakegh.CheckRun{Name: "codecov", Status: "completed", Conclusion: "failure"})
+
+	f.mustRun(t)
+	var checks []map[string]any
+	if err := json.Unmarshal([]byte(mustRead(t, filepath.Join(f.repo.Dir, "review", "checks.json"))), &checks); err != nil {
+		t.Fatal(err)
+	}
+	want := []map[string]any{{"name": "test", "conclusion": "success"}, {"name": "codecov", "conclusion": "failure"}}
+	if got, _ := json.Marshal(checks); string(got) != mustJSON(t, want) {
+		t.Errorf("checks.json %s, want %s", got, mustJSON(t, want))
+	}
+}
+
+// One fast check finishing says nothing about the slower workflows that have not registered theirs yet.
+func TestCaptureScriptWaitsOutTheGraceBeforeAcceptingFinished(t *testing.T) {
+	f := newCaptureFixture(t)
+	// The script counts whole seconds, so a 3s grace guarantees more than 2s of real time.
+	f.vars["LOUPE_CI_GRACE_SECONDS"] = "3"
+	f.vars["LOUPE_CI_POLL_SECONDS"] = "1"
+	f.gh.SeedCheckRun("o", "r", f.repo.HeadSHA(), fakegh.CheckRun{Name: "lint", Status: "completed", Conclusion: "success"})
+
+	start := time.Now()
+	f.mustRun(t)
+	if elapsed := time.Since(start); elapsed < 2*time.Second {
+		t.Errorf("the wait accepted the finished checks after %s, before the 3s grace", elapsed)
 	}
 }
 

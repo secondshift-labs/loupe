@@ -1,0 +1,184 @@
+name: loupe publish
+
+# The only job of a round that holds a token able to write to the pull request. It runs no caller step and checks out
+# nothing from the pull request: it publishes the run that ci/save uploaded, and loupe checks the body against its
+# Markdown allowlist before anything is sent.
+on:
+  workflow_call:
+    inputs:
+      pull_request:
+        description: Pull request number to publish the review on
+        required: true
+        # A string, not a number: workflow_dispatch hands its inputs over as strings whatever type the caller
+        # declares, and a number input rejects one, failing the run before any job starts.
+        type: string
+      source:
+        description: Source name, as given to ci/capture and ci/save
+        required: true
+        type: string
+      sticky:
+        description: Edit one review per pull request in place instead of posting a new review each round
+        required: false
+        type: boolean
+        default: false
+      note:
+        description: A line under the newest round of a sticky review, such as how to ask for another round
+        required: false
+        type: string
+        default: ""
+    outputs:
+      review_url:
+        description: The published or edited review
+        value: ${{ jobs.publish.outputs.review_url }}
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # A called workflow's permissions are capped by the calling job's, so the caller MUST grant these on its call.
+    permissions:
+      # No checkout of the caller here, but a private repository caps its REST reads on this scope too.
+      contents: read
+      pull-requests: write
+      # For listing this run's artifacts, which is how a rerun knows whether this job already published.
+      actions: read
+    # Two rounds queued for one series would otherwise post at once.
+    concurrency:
+      group: loupe-publish-${{ inputs.pull_request }}-${{ inputs.source }}
+      cancel-in-progress: false
+    outputs:
+      review_url: ${{ steps.publish.outputs.review_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PULL_REQUEST: ${{ inputs.pull_request }}
+      SOURCE: ${{ inputs.source }}
+      REPOSITORY: ${{ github.repository }}
+      LOUPE_RUN: ${{ github.repository }}#${{ inputs.pull_request }}
+    steps:
+      # The commit this workflow runs from, so the install below is the release the caller pinned, with no version
+      # string in this file.
+      - name: Read this workflow's own commit
+        id: own
+        env:
+          OWN_SHA: ${{ github.workflow_sha }}
+        run: |
+          if ! [[ "$OWN_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::could not read the commit this publish workflow runs from (got '$OWN_SHA'), so the loupe release to install is unknown"
+            exit 1
+          fi
+          # The number reaches URLs and artifact names.
+          if ! [[ "$PULL_REQUEST" =~ ^[0-9]+$ ]]; then
+            echo "::error::pull_request '$PULL_REQUEST' is not a pull request number"
+            exit 1
+          fi
+          echo "sha=$OWN_SHA" >> "$GITHUB_OUTPUT"
+          echo "LOUPE_HOME=$RUNNER_TEMP/loupe-home" >> "$GITHUB_ENV"
+
+      - name: Check out loupe's install action at that commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: secondshift-labs/loupe
+          ref: ${{ steps.own.outputs.sha }}
+          sparse-checkout: action.yml
+          sparse-checkout-cone-mode: false
+          path: .loupe
+          persist-credentials: false
+
+      - name: Install loupe
+        uses: ./.loupe
+
+      # Asked about rather than attempted: a download of an artifact that is not there fails the step. A rerun that
+      # started from the reviewed run would hold no attempt or receipt, so it could post the review a second time.
+      - name: Look for this job's publication state
+        id: published
+        run: |
+          name="loupe-$PULL_REQUEST-$SOURCE-published"
+          # A failed listing is not an absent artifact. Treating it as absent on a rerun is the double post this
+          # check exists to stop.
+          if ! names=$(gh api "repos/$REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --paginate --jq '.artifacts[].name'); then
+            echo "::error::could not list this run's artifacts, so whether this job already published is unknown. Check the pull request before re-running."
+            exit 1
+          fi
+          if grep -qxF "$name" <<<"$names"; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore this job's publication state
+        if: steps.published.outputs.found == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: loupe-${{ inputs.pull_request }}-${{ inputs.source }}-published
+          path: ${{ env.LOUPE_HOME }}
+
+      - name: Refuse a rerun that cannot recover its publication state
+        if: steps.published.outputs.found != 'true' && github.run_attempt != '1'
+        run: |
+          echo "::error::attempt $GITHUB_RUN_ATTEMPT found no loupe-$PULL_REQUEST-$SOURCE-published artifact. An earlier attempt may have posted a review this one cannot see, so publishing now could post it twice. Check the pull request, then ask for a fresh round."
+          exit 1
+
+      - name: Restore the reviewed run
+        if: steps.published.outputs.found != 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: loupe-${{ inputs.pull_request }}-${{ inputs.source }}-reviewed
+          path: ${{ env.LOUPE_HOME }}
+
+      # The artifact was written by a job that ran an agent on untrusted pull request text, so the run MUST name this
+      # pull request and series before anything is posted from it.
+      - name: Check the run names this pull request and source
+        run: |
+          set -euo pipefail
+          if ! show=$(loupe show --run "$LOUPE_RUN" --json); then
+            echo "::error::loupe show refused: $(jq -r '.error.message // .' <<<"$show")"
+            echo "error: $(jq -r '.error.message // .' <<<"$show")" >&2
+            echo "fix: $(jq -r '.error.fix // ""' <<<"$show")" >&2
+            exit 1
+          fi
+          if ! jq -e --arg repo "$REPOSITORY" --argjson number "$PULL_REQUEST" --arg source "$SOURCE" \
+            '(.target.owner + "/" + .target.repo) == $repo and .target.number == $number and .target.source == $source' \
+            <<<"$show" >/dev/null; then
+            echo "::error::the restored run is for $(jq -r '"\(.target.owner)/\(.target.repo)#\(.target.number) source \(.target.source)"' <<<"$show"), not $REPOSITORY#$PULL_REQUEST source $SOURCE; refusing to publish it"
+            exit 1
+          fi
+
+      - name: Publish unattended
+        id: publish
+        env:
+          STICKY: ${{ inputs.sticky }}
+          NOTE: ${{ inputs.note }}
+        run: |
+          set -euo pipefail
+          args=(--unattended --json)
+          if [ "$STICKY" = "true" ]; then
+            args+=(--sticky)
+          fi
+          if [ -n "$NOTE" ]; then
+            args+=(--note "$NOTE")
+          fi
+          # --json puts a refusal on stdout. A replayed receipt is a success: an earlier attempt already posted.
+          if ! result=$(loupe publish "$LOUPE_RUN" "${args[@]}"); then
+            echo "::error::loupe publish refused: $(jq -r '.error.message // .' <<<"$result")"
+            echo "error: $(jq -r '.error.message // .' <<<"$result")" >&2
+            echo "fix: $(jq -r '.error.fix // ""' <<<"$result")" >&2
+            exit 1
+          fi
+          echo "$result"
+          echo "review_url=$(jq -r '.reviewUrl' <<<"$result")" >> "$GITHUB_OUTPUT"
+          jq -r '(if .edited then "Edited" else "Published" end) + " \(.reviewUrl)" + (if .replayed then " (replayed from the receipt)" else "" end)' \
+            <<<"$result" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The run directory is the only evidence of a publication once the runner is gone, so it is kept whether the
+      # publish step succeeded, refused or failed, under one name the lookup above finds.
+      - name: Upload this job's publication state
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          overwrite: true
+          name: loupe-${{ inputs.pull_request }}-${{ inputs.source }}-published
+          path: ${{ env.LOUPE_HOME }}
+          include-hidden-files: true
+          if-no-files-found: ignore

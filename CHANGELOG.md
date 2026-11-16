@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/secondshift-labs/loupe/compare/v0.25.0...v0.25.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **capture:** pass the reviewing model to loupe capture ([#151](https://github.com/secondshift-labs/loupe/issues/151)) ([d0dea85](https://github.com/secondshift-labs/loupe/commit/d0dea85ee2ea21632d9acb04b173ad15e9bce479))
+
 ## [0.25.0](https://github.com/secondshift-labs/loupe/compare/v0.24.2...v0.25.0) (2026-11-16)
 
 

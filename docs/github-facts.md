@@ -112,3 +112,11 @@ Observed on 2026-09-16 in `.github/workflows/review.yml` run 35049778372, on `er
 - `GET /user` was not exercised: capture skips it for an installation token, which is the whole point of the branch. Its 403 remains unobserved.
 - `anthropics/claude-code-action` confines the agent's `Read` to its working directory plus `--add-dir`: a read of `/home/runner/work/loupe/review/head/mise.toml`, one directory above the workspace, was refused as a permission denial. The action's own documentation claims `--add-dir` only grants a directory, so this is stronger than documented and MUST NOT be relied on across versions.
 - An OpenRouter balance too low for the run ends the agent step with `API Error: 402`, `terminal_reason: api_error` and a failed job, after the model has already been billed for the turns it took.
+
+## Unverified until probed
+
+`specs/058-ci-workflows` item 1 asks three questions about reusable workflows and actions called from another repository. Each runs on `eriksaulnier/loupe-probe#1` when the owner asks. No answer is recorded yet, and the pieces in `ci/` and `.github/workflows/publish.yml` assume the passing answer to each.
+
+- 1a. Whether a called workflow can read the commit it was called at, through a field such as `github.workflow_sha`, `github.job_workflow_sha` or `job.workflow_sha`. `publish.yml` reads `github.workflow_sha` and refuses if it is not a 40-character SHA.
+- 1b. Whether an action in a subdirectory of another repository, used at a SHA, gets the whole repository, so that `$GITHUB_ACTION_PATH/../../action.yml` and `install.sh` exist. `ci/capture` installs loupe from them.
+- 1c. Whether a write permission granted by the caller reaches a job two reusable workflows down. The `unlabel` step of the starter file is the case that needs it.

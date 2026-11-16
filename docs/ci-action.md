@@ -168,7 +168,7 @@ The workflow sets `permissions: {}` and each job asks for its own. The review jo
 
 ### The agent's contract
 
-1. Read `review/`. It holds the head's files, `pr.diff` and, on an automatic round, `checks.json`.
+1. Read `review/`. It holds the head's files, `pr.diff` and `checks.json`, the checks on the head that have finished. `checks.json` is absent when `ci/capture` could not read the check runs or this workflow's own runs.
 2. Follow `loupe show --help`. It lists the steps in order, including the sticky-round steps.
 3. File findings with `loupe add` and finish with `loupe summary`.
 4. Do not publish. The publish job does that.

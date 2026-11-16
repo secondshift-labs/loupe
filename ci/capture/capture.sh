@@ -110,9 +110,15 @@ fi
 # out of both the wait and checks.json.
 workflow=${GITHUB_WORKFLOW_REF#"$repo"/}
 workflow=${workflow%%@*}
-runs=$(api_all "repos/$repo/actions/runs?head_sha=$head" workflow_runs)
-own=$(printf '%s' "$runs" |
-	jq -c --arg path "$workflow" '[.[] | select((.path | sub("@.*$"; "")) == $path) | .id]')
+# Without the list, the round's own check runs cannot be told apart, so the wait and checks.json are skipped, as they
+# are when the check runs cannot be read.
+own=
+if runs=$(api_all "repos/$repo/actions/runs?head_sha=$head" workflow_runs); then
+	own=$(printf '%s' "$runs" |
+		jq -c --arg path "$workflow" '[.[] | select((.path | sub("@.*$"; "")) == $path) | .id]')
+else
+	echo "::warning::could not list this workflow's runs on $head, so reviewing without waiting for checks and without review/checks.json. The review job needs actions: read."
+fi
 
 others() {
 	check_runs=$(api_all "repos/$repo/commits/$head/check-runs?filter=latest" check_runs) || return 1
@@ -122,7 +128,7 @@ others() {
 
 # An automatic round starts before the pull request's checks have reported, while a requested one was asked for by
 # someone who judged it ready.
-if [ "$automatic" = true ] && [ "$LOUPE_CI_WAIT_FOR_CHECKS" -gt 0 ]; then
+if [ -n "$own" ] && [ "$automatic" = true ] && [ "$LOUPE_CI_WAIT_FOR_CHECKS" -gt 0 ]; then
 	start=$(date +%s)
 	deadline=$((start + LOUPE_CI_WAIT_FOR_CHECKS * 60))
 	while :; do
@@ -158,7 +164,9 @@ git archive "$head" | tar -x -C review
 find review -type l -exec rm -f {} +
 rm -f review/pr.diff review/checks.json
 loupe show --run "$run" --diff >review/pr.diff
-if checks=$(others); then
+if [ -z "$own" ]; then
+	:
+elif checks=$(others); then
 	printf '%s' "$checks" | jq '[.[] | select(.status == "completed") | {name, conclusion}]' >review/checks.json
 else
 	# Absent rather than empty: an empty list would tell the reviewer that nothing ran.

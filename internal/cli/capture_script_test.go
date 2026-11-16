@@ -355,6 +355,25 @@ func TestCaptureScriptReadsPagesLargerThanAnArgument(t *testing.T) {
 	}
 }
 
+// A caller whose review job lacks actions: read cannot list its own runs. That costs the wait and checks.json, as a
+// failed check-run listing does, not the round.
+func TestCaptureScriptReviewsWhenItCannotListItsOwnRuns(t *testing.T) {
+	f := newCaptureFixture(t)
+	f.gh.Fail("GET", "/repos/o/r/actions/runs", 403)
+	f.gh.SeedCheckRun("o", "r", f.repo.HeadSHA(), fakegh.CheckRun{Name: "test", Status: "in_progress"})
+
+	out, stdout := f.mustRun(t)
+	if out["skip"] != "false" {
+		t.Fatalf("outputs %v", out)
+	}
+	if !strings.Contains(stdout, "::warning::") || !strings.Contains(stdout, "actions: read") {
+		t.Errorf("no warning naming actions: read:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(f.repo.Dir, "review", "checks.json")); !os.IsNotExist(err) {
+		t.Errorf("review/checks.json was written without the run list: %v", err)
+	}
+}
+
 // One fast check finishing says nothing about the slower workflows that have not registered theirs yet.
 func TestCaptureScriptWaitsOutTheGraceBeforeAcceptingFinished(t *testing.T) {
 	f := newCaptureFixture(t)

@@ -1,0 +1,22 @@
+name: loupe save
+description: Upload the data root that ci/capture and the agent filled, for the publish job to restore.
+
+inputs:
+  pull_request:
+    description: Pull request number, as given to ci/capture
+    required: true
+  source:
+    description: Source name, as given to ci/capture
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Upload the data root
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: loupe-${{ inputs.pull_request }}-${{ inputs.source }}-reviewed
+        path: ${{ env.LOUPE_HOME }}
+        # Without it the upload silently drops loupe's files, and publish finds no findings.
+        include-hidden-files: true
+        if-no-files-found: error

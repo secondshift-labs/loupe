@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -330,6 +331,27 @@ func TestCaptureScriptReadsEveryPage(t *testing.T) {
 	want := []map[string]any{{"name": "test", "conclusion": "success"}, {"name": "codecov", "conclusion": "failure"}}
 	if got, _ := json.Marshal(checks); string(got) != mustJSON(t, want) {
 		t.Errorf("checks.json %s, want %s", got, mustJSON(t, want))
+	}
+}
+
+// Real check runs are large objects, and pages that together pass Linux's 128 KiB limit on one argument MUST still
+// combine.
+func TestCaptureScriptReadsPagesLargerThanAnArgument(t *testing.T) {
+	f := newCaptureFixture(t)
+	head := f.repo.HeadSHA()
+	const runs = 150
+	for i := range runs {
+		f.gh.SeedCheckRun("o", "r", head, fakegh.CheckRun{Name: fmt.Sprintf("check-%03d-%s", i, strings.Repeat("x", 2048)),
+			Status: "completed", Conclusion: "success"})
+	}
+
+	f.mustRun(t)
+	var checks []map[string]any
+	if err := json.Unmarshal([]byte(mustRead(t, filepath.Join(f.repo.Dir, "review", "checks.json"))), &checks); err != nil {
+		t.Fatal(err)
+	}
+	if len(checks) != runs {
+		t.Errorf("checks.json holds %d check runs, want %d", len(checks), runs)
 	}
 }
 

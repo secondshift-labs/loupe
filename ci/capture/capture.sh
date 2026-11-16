@@ -35,22 +35,33 @@ api() {
 		"$GITHUB_API_URL/$1"
 }
 
-# Every page of a list endpoint, as one JSON array of the items under $2. GitHub caps a page at 100.
+# Every page of a list endpoint, as one JSON array of the items under $2. GitHub caps a page at 100. Pages collect in a
+# file, because a busy commit's runs outgrow the 128 KiB Linux allows one argument. Every step is checked by hand:
+# callers run this inside an if, where set -e does not apply.
 api_all() {
+	pages=$(mktemp) || return 1
 	page=1
-	items='[]'
 	while :; do
-		body=$(api "$1&per_page=100&page=$page") || return 1
-		items=$(printf '%s' "$body" | jq -c --argjson acc "$items" --arg key "$2" '$acc + .[$key]')
-		got=$(printf '%s' "$items" | jq length)
-		listed=$(printf '%s' "$body" | jq '.total_count')
-		new=$(printf '%s' "$body" | jq --arg key "$2" '.[$key] | length')
+		if ! {
+			body=$(api "$1&per_page=100&page=$page") &&
+				printf '%s' "$body" | jq -c --arg key "$2" '.[$key][]' >>"$pages" &&
+				listed=$(printf '%s' "$body" | jq -e '.total_count') &&
+				new=$(printf '%s' "$body" | jq -e --arg key "$2" '.[$key] | length') &&
+				got=$(wc -l <"$pages")
+		}; then
+			rm -f "$pages"
+			return 1
+		fi
 		if [ "$got" -ge "$listed" ] || [ "$new" -eq 0 ]; then
 			break
 		fi
 		page=$((page + 1))
 	done
-	printf '%s' "$items"
+	if ! jq -c -s '.' "$pages"; then
+		rm -f "$pages"
+		return 1
+	fi
+	rm -f "$pages"
 }
 
 skip() {

@@ -9,7 +9,7 @@ inputs:
     description: Source name loupe records and a sticky round finds its review by. It MUST NOT change between rounds.
     required: true
   model:
-    description: The model the reviewing agent runs, which the published footer and loupe-meta name. Empty leaves it out.
+    description: The model the reviewing agent runs, which the published footer and loupe-meta name. It MUST match ^[a-z0-9][a-z0-9._/:-]*$, be at most 64 characters and contain no --, such as anthropic/claude-opus-5.5, or loupe capture refuses and the round fails. Empty leaves it out.
     required: false
     default: ""
   wait_for_checks:

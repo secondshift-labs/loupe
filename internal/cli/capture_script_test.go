@@ -374,6 +374,30 @@ func TestCaptureScriptReviewsWhenItCannotListItsOwnRuns(t *testing.T) {
 	}
 }
 
+// The published footer and loupe-meta name the model only when capture recorded it.
+func TestCaptureScriptPassesTheModelToCapture(t *testing.T) {
+	for _, c := range []struct {
+		name, model string
+		want        bool
+	}{
+		{"given", "anthropic/claude-opus-5.5", true},
+		{"empty", "", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newCaptureFixture(t)
+			f.vars["LOUPE_CI_MODEL"] = c.model
+			f.mustRun(t)
+			calls := mustRead(t, filepath.Join(f.stub, "calls"))
+			if got := strings.Contains(calls, "--model anthropic/claude-opus-5.5"); got != c.want {
+				t.Errorf("loupe calls:\n%s\nwant --model passed: %v", calls, c.want)
+			}
+			if !c.want && strings.Contains(calls, "--model") {
+				t.Errorf("an empty model still reached capture:\n%s", calls)
+			}
+		})
+	}
+}
+
 // One fast check finishing says nothing about the slower workflows that have not registered theirs yet.
 func TestCaptureScriptWaitsOutTheGraceBeforeAcceptingFinished(t *testing.T) {
 	f := newCaptureFixture(t)

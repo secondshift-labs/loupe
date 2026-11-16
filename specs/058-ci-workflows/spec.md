@@ -107,7 +107,7 @@ caller's workflow file: on:, permissions: {}, concurrency:, source
 ├─ job publish ── uses: secondshift-labs/loupe/.github/workflows/publish.yml@<sha>
 │                 needs: review
 │                 if: needs.review.result == 'success' && needs.review.outputs.skip != 'true'
-│                 permissions: contents: read, pull-requests: write, actions: read
+│                 permissions: contents: read, pull-requests: write
 │
 └─ job unlabel ── the caller's own, if: always() and a label started the round
                   permissions: pull-requests: write
@@ -143,12 +143,12 @@ It uploads the data root as artifact `loupe-<pr>-<source>-reviewed`, with `inclu
 It is the old workflow's `publish` job, with these changes: it installs loupe from its own commit, it checks the run it restores, and it has a job-level concurrency group. Its unlabel job moves to the caller.
 
 *   **Inputs**: `pull_request` (required), `source` (required), `sticky` (boolean, default `false`, as in the old workflow), `note` (default empty).
-*   **Permissions**: `contents: read`, `pull-requests: write`, `actions: read`. It runs no caller step and checks out nothing from the pull request (FR-030).
+*   **Permissions**: `contents: read`, `pull-requests: write`. It runs no caller step and checks out nothing from the pull request (FR-030).
 *   **Concurrency**: the job-level group `loupe-publish-<pr>-<source>`, `cancel-in-progress: false`.
 *   **Install.** It reads its own commit at run time (probe, item 1), checks out only `action.yml` from `secondshift-labs/loupe` at that commit into `.loupe/`, and runs it as the local action `./.loupe`. That installs the release the caller pinned, with no version string in `publish.yml`. Fallback if the probe fails: release-please gets a token with `workflows` permission, and `publish.yml` carries a stamped `uses: secondshift-labs/loupe@v<version> # x-release-please-version`.
-*   **Rerun guard.** If this job's `loupe-<pr>-<source>-published` artifact exists from an earlier attempt, it restores it, so `loupe publish` finds its receipt. If it does not exist and `github.run_attempt` is above 1, the job refuses, because attempt 1 may have posted. Otherwise it downloads the `-reviewed` artifact.
+*   **Rerun guard.** When `github.run_attempt` is above 1, the job refuses, because an earlier attempt may have posted and nothing this job can trust records whether it did. An artifact could, but the review job, which runs the agent, can upload one under any name. The way back is a fresh round. On attempt 1 it downloads the `-reviewed` artifact.
 *   **Trust check.** The `-reviewed` artifact was written by a job that ran an agent on untrusted pull request text. Before publishing, it reads the run with `loupe show --run <ref> --json` and refuses unless `target.owner/target.repo` is `github.repository`, `target.number` is `pull_request` and `target.source` is `source`. Everything else in the run, such as the findings and the summary, is the reviewer's output and is published as such. loupe's Markdown allowlist (`docs/comment-format.md`) applies to it.
-*   **Publish.** `loupe publish <ref> --unattended --json`, plus `--sticky` and `--note` when set. It uploads the data root as `loupe-<pr>-<source>-published` with `if: always()`.
+*   **Publish.** `loupe publish <ref> --unattended --json`, plus `--sticky` and `--note` when set. A result with `replayed: true` fails the job, since this job restores no receipt of its own and a replay means the restored run carried one. `review_url` is written only when it matches `https://github.com/<repo>/pull/<n>#pullrequestreview-<id>`. It uploads the data root as `loupe-<pr>-<source>-published` with `if: always()`, as evidence that nothing reads back.
 *   **Outputs**: `review_url`.
 
 ### Change to the loupe binary
@@ -195,7 +195,7 @@ The prompt, the model and provider inputs, `max_turns`, the instructions file, t
 *   **The agent reads the read-only token.** The review job's `GITHUB_TOKEN` can read the repository and its pull requests. `ci/capture` never stores or exports it, but an agent that the caller passes `${{ github.token }}` to can still read it. It cannot write. On a private repository, an agent can already read the code, so the token adds little.
 *   **A prompt-injected agent writes a misleading run.** The trust check stops a post to another pull request or series. It cannot stop false findings, which is the same risk as any unattended review.
 *   **Two rounds at the same head.** Two requests in quick succession both run, spend two model runs, and edit the same sticky review twice. The starter's workflow-level concurrency group queues them. Without it, the publish job's group still serializes the posts, and `loupe publish` refuses a stale round with `head-moved` when the head has moved.
-*   **A rerun after the agent fails cannot publish.** "Re-run failed jobs" makes attempt 2, and publish refuses when it finds no published artifact from attempt 1. The fix is a fresh round by the label, as today. Safe reruns are a Future Improvement.
+*   **A rerun cannot publish.** "Re-run failed jobs" makes attempt 2, and publish refuses every attempt after the first. The fix is a fresh round by the label, as today. Safe reruns are a Future Improvement.
 *   **Size.** The artifact is the data root: the diff and the run's JSON files. It grows with the diff, not the repository. A diff past the artifact size limit fails the upload, and the step fails. No limit beyond GitHub's own applies.
 *   **The probe fails.** If `publish.yml` cannot read its own commit, the fallback adds a release token. If an action in a subdirectory does not get the whole repository, `ci/capture` installs through a stamped `uses: secondshift-labs/loupe@v<version>` instead, a tag that can move after release.
 
@@ -340,7 +340,7 @@ Items run in this order. Item 1 comes first because each of its three answers ca
 #### 11. `.github/workflows/publish.yml` (Create)
 
 *   **Type / Scope**: Reusable workflow (`on: workflow_call` only).
-*   **Proposed Changes**: As in the How section. One job, `publish`, with the permissions and concurrency group above. Steps, each action pinned by SHA: read own commit (item 1a's answer); `actions/checkout` of `secondshift-labs/loupe` at that commit with `sparse-checkout: action.yml` into `.loupe`; `uses: ./.loupe`; list this run's artifacts and look for `loupe-<pr>-<source>-published`. If it exists, restore it. If it does not exist and `github.run_attempt` is above 1, refuse. Otherwise, download `-reviewed`. Then the trust check with `loupe show --json`, `loupe publish --unattended --json` with `--sticky` and `--note` when set, and the upload of `-published` with `if: always()` and `include-hidden-files: true`. Steps use `gh`, `jq` and `$GITHUB_OUTPUT`. The output `review_url` comes from the publish result. Carries over the old job's live-run fixes: `pull_request` is a string input, and a refusal is read from stdout.
+*   **Proposed Changes**: As in the How section. One job, `publish`, with the permissions and concurrency group above. Steps, each action pinned by SHA: read own commit (item 1a's answer); `actions/checkout` of `secondshift-labs/loupe` at that commit with `sparse-checkout: action.yml` into `.loupe`; `uses: ./.loupe`; refuse when `github.run_attempt` is above 1; download `-reviewed`. Then the trust check with `loupe show --json`, `loupe publish --unattended --json` with `--sticky` and `--note` when set, the `replayed` and `review_url` checks, and the upload of `-published` with `if: always()` and `include-hidden-files: true`. Steps use `gh`, `jq` and `$GITHUB_OUTPUT`. The output `review_url` comes from the publish result. Carries over the old job's live-run fixes: `pull_request` is a string input, and a refusal is read from stdout.
 
 #### 12. `internal/cli/action_test.go` (Modify)
 
@@ -425,7 +425,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      actions: read
     uses: secondshift-labs/loupe/.github/workflows/publish.yml@<sha> # vX.Y.Z
     with:
       pull_request: ${{ inputs.pull_request || github.event.pull_request.number }}

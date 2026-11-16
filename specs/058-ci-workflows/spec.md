@@ -119,7 +119,7 @@ A round whose review job fails does not publish. `ci/save` runs only when the ag
 
 It does every reviewer-neutral step before the review, taken from the old workflow's `review` job.
 
-*   **Inputs**: `pull_request` (required), `source` (required), `wait_for_checks` (minutes, default `10`, `0` turns it off), `github-token` (default `${{ github.token }}`).
+*   **Inputs**: `pull_request` (required), `source` (required), `model` (optional, passed to `loupe capture --model` so the published footer and `loupe-meta` name it; amended 2026-11-15), `wait_for_checks` (minutes, default `10`, `0` turns it off), `github-token` (default `${{ github.token }}`).
 *   **Automatic or requested.** It reads the trigger from `github.event_name` and `github.event.action`. A `pull_request` event with `opened`, `ready_for_review` or `synchronize` is automatic. Anything else is requested.
 *   **Fork skip.** A pull request whose head repository is not `github.repository` sets `skip=true`, `reason=fork`, and stops.
 *   **Install.** A `run:` step of its own, before the script. It installs the loupe release its own commit shipped, from its own copy of the repository, so its pin covers the install code. It reads the version from the stamped `default:` line of `$GITHUB_ACTION_PATH/../../action.yml` and runs `$GITHUB_ACTION_PATH/../../install.sh` with `LOUPE_VERSION`, `LOUPE_INSTALL_DIR=$RUNNER_TEMP/loupe-bin` and `LOUPE_NO_PLUGINS=1`. `install.sh` checks the archive against the release's `checksums.txt` (Principle III).
@@ -409,6 +409,8 @@ jobs:
         with:
           pull_request: ${{ inputs.pull_request || github.event.pull_request.number }}
           source: my-reviewer
+          # The model your agent runs, for the review's footer. Leave it out to omit it.
+          model: my-model
       - name: Review
         if: steps.capture.outputs.skip != 'true'
         # Your agent goes here. It reads review/ and follows `loupe show --help`.

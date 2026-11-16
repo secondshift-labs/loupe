@@ -112,6 +112,8 @@ jobs:
         with:
           pull_request: ${{ inputs.pull_request || github.event.pull_request.number }}
           source: my-reviewer
+          # The model your agent runs, for the review's footer. Leave it out to omit it.
+          model: my-model
       - name: Review
         if: steps.capture.outputs.skip != 'true'
         # Your agent goes here. It reads review/ and follows `loupe show --help`.

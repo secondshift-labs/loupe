@@ -85,10 +85,15 @@ fi
 LOUPE_HOME=$RUNNER_TEMP/loupe-home
 export LOUPE_HOME
 header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+# POSIX sh has no arrays, so the optional --model goes through the positional parameters.
+set -- --source "$source"
+if [ -n "${LOUPE_CI_MODEL:-}" ]; then
+	set -- "$@" --model "$LOUPE_CI_MODEL"
+fi
 # --json puts a refusal on stdout, so it is read from there.
 if ! result=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
 	GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $header" \
-	loupe capture "https://github.com/$repo/pull/$pr" --source "$source" --json); then
+	loupe capture "https://github.com/$repo/pull/$pr" "$@" --json); then
 	message=$(printf '%s' "$result" | jq -r '.error.message // empty' 2>/dev/null || true)
 	echo "::error::loupe capture refused: ${message:-$result}" >&2
 	printf 'error: %s\n' "${message:-$result}" >&2

@@ -65,7 +65,7 @@ Spec 058's migration rebuilds the reference Claude reviewer on these pieces as `
 3. Set `source` to the same name in `ci/capture`, `ci/save` and `publish.yml`.
 4. Replace the Review step with your agent.
 5. Create the `ai-review` label. Adding it asks for another round.
-6. Review `if:` on the review job. It is your policy.
+6. Review `if:` on the review job. It is your policy. If you change it, change the same condition in the workflow's `concurrency.group` to match. A run the group calls ineligible does not queue, and one it calls eligible but the `if:` skips can cancel a waiting round.
 
 ```yaml
 name: review
@@ -82,9 +82,25 @@ on:
 
 permissions: {}
 
+# One round at a time per pull request, from capture through publish: a round that captured while the one before
+# it was still publishing would assess a stale previous round, and its publish would refuse with previous-moved.
+# GitHub keeps one waiting run per group, so a run the review job's if turns away gets a group of its own and
+# cannot cancel a round waiting its turn. The condition here MUST match that if.
+concurrency:
+  group: >-
+    ${{ (github.event_name == 'workflow_dispatch' ||
+    (github.event.action == 'labeled' && github.event.label.name == 'ai-review') ||
+    (github.event.action != 'labeled' && !github.event.pull_request.draft &&
+    !startsWith(github.head_ref, 'release-please--') &&
+    !endsWith(github.event.pull_request.user.login, '[bot]')))
+    && format('loupe-review-{0}', inputs.pull_request || github.event.pull_request.number)
+    || format('loupe-review-turned-away-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 jobs:
   review:
-    # Policy: edit freely. A label or a dispatch overrides the automatic skips.
+    # Policy: edit freely, but change the condition in concurrency.group above to match, or rounds stop
+    # queueing. A label or a dispatch overrides the automatic skips.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'ai-review') ||
@@ -94,11 +110,6 @@ jobs:
     runs-on: ubuntu-latest
     # Up to 10 minutes of waiting for checks, plus the agent's own time.
     timeout-minutes: 30
-    # On the job, not the workflow: only runs that pass the if above take a place, so an unrelated label cannot
-    # cancel a round that is waiting its turn.
-    concurrency:
-      group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
-      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read
@@ -161,7 +172,7 @@ jobs:
 | You bring | loupe gives |
 | :--- | :--- |
 | The agent step, with its model, prompt and credentials | A pinned, checksum-verified loupe on `PATH` |
-| The triggers and the `if:` policy on the review job | The captured head and diff in `review/`, and the other checks' results in `review/checks.json` |
+| The triggers and the `if:` policy on the review job, with the `concurrency.group` condition kept in step | The captured head and diff in `review/`, and the other checks' results in `review/checks.json` |
 | The `source` name | The skip for forks and for a head that `source` already reviewed |
 | The `unlabel` job | The upload of the run, and the publish job that restores, checks and posts it |
 

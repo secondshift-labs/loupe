@@ -6,12 +6,20 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+    # A week's wait before a new release is proposed, so one pulled soon after publishing never
+    # lands.
+    cooldown:
+      default-days: 7
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
     commit-message:
       prefix: build
+    # A week's wait before a new release is proposed, so one pulled soon after publishing never
+    # lands.
+    cooldown:
+      default-days: 7
     groups:
       go-modules:
         patterns: ["*"]

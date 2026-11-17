@@ -93,7 +93,7 @@ The rebuilt reviewer (specs/058-ci-workflows migration step 4), run between 00:0
 - Rounds 1 and 2, on the v3 branch of `loupe-workflows` at `7aab4d7`: round 1 posted the review, and round 2 edited it in place. The `ai-review` label was gone after each round.
 - Round 3, after a rollback to the v2.2.0 pin `fc789c0`, edited the same review.
 - Round 4, back on v3 at `740f5e9` (the lock fix), edited it again.
-- Neither v3 commit is the v3.0.0 release commit `7555c6d`, which was squash-merged afterward. At `7555c6d`, a first round published on `secondshift-labs/loupe#154`, but no sticky edit had been observed at that commit when this was written.
+- Neither v3 commit is the v3.0.0 release commit `7555c6d`, which was squash-merged afterward. At `7555c6d` itself, on 2026-11-17, loupe's own caller ran a second round on `secondshift-labs/loupe#156` (run 44010883769, `source: loupe-ci`, `sticky: true`). It edited round 1's review 5932291712 in place, the pull request still had one review, and the label was gone afterward.
 
 ## Unverified
 

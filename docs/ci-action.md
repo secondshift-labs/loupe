@@ -65,7 +65,7 @@ Spec 058's migration rebuilds the reference Claude reviewer on these pieces as `
 3. Set `source` to the same name in `ci/capture`, `ci/save` and `publish.yml`.
 4. Replace the Review step with your agent.
 5. Create the `ai-review` label. Adding it asks for another round.
-6. Review `if:` on the review job. It is your policy.
+6. Review `if:` on the review job. It is your policy. If you change it, change the same condition in the workflow's `concurrency.group` to match. A run the group calls ineligible does not queue, and one it calls eligible but the `if:` skips can cancel a waiting round.
 
 ```yaml
 name: review
@@ -99,7 +99,8 @@ concurrency:
 
 jobs:
   review:
-    # Policy: edit freely. A label or a dispatch overrides the automatic skips.
+    # Policy: edit freely, but change the condition in concurrency.group above to match, or rounds stop
+    # queueing. A label or a dispatch overrides the automatic skips.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'ai-review') ||
@@ -171,7 +172,7 @@ jobs:
 | You bring | loupe gives |
 | :--- | :--- |
 | The agent step, with its model, prompt and credentials | A pinned, checksum-verified loupe on `PATH` |
-| The triggers and the `if:` policy on the review job | The captured head and diff in `review/`, and the other checks' results in `review/checks.json` |
+| The triggers and the `if:` policy on the review job, with the `concurrency.group` condition kept in step | The captured head and diff in `review/`, and the other checks' results in `review/checks.json` |
 | The `source` name | The skip for forks and for a head that `source` already reviewed |
 | The `unlabel` job | The upload of the run, and the publish job that restores, checks and posts it |
 

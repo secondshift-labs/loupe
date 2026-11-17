@@ -396,7 +396,8 @@ concurrency:
 
 jobs:
   review:
-    # Policy: edit freely. A label or a dispatch overrides the automatic skips.
+    # Policy: edit freely, but change the condition in concurrency.group above to match, or rounds stop
+    # queueing. A label or a dispatch overrides the automatic skips.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'ai-review') ||

@@ -56,7 +56,7 @@ A round is two jobs in your workflow file: a review job and a publish job. loupe
 - `secondshift-labs/loupe/ci/save` uploads the run for the publish job.
 - `secondshift-labs/loupe/.github/workflows/publish.yml` is a reusable workflow. It restores the run, checks it names this pull request and source, and publishes it unattended. It runs no step of yours.
 
-Spec 058's migration rebuilds the reference Claude reviewer on these pieces as `secondshift-labs/ai-review-workflows`. Until then, loupe reviews its own pull requests through [`.github/workflows/review.yml`](../.github/workflows/review.yml), which calls the older bundled `eriksaulnier/loupe-workflows`.
+[`secondshift-labs/ai-review-workflows`](https://github.com/secondshift-labs/ai-review-workflows) is the reference Claude reviewer built on these pieces. loupe reviews its own pull requests through it, from [`.github/workflows/review.yml`](../.github/workflows/review.yml).
 
 ### Set up a caller
 

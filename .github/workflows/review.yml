@@ -1,9 +1,10 @@
 name: review
 
-# The plumbing lives in eriksaulnier/loupe-workflows, shared with the other repositories reviewed this
-# way. What stays here is what only this repository can answer: when a round is asked for, whether
-# rounds are turned on at all, and which model reviews. The per-round guidance is in
-# .github/review-instructions.md, read from the default branch and never from the pull request.
+# The plumbing lives in secondshift-labs/ai-review-workflows, the reference Claude reviewer built on
+# loupe's ci/capture, ci/save and publish.yml. What stays here is what only this repository can
+# answer: when a round is asked for, whether rounds are turned on at all, and which model reviews.
+# The per-round guidance is in .github/review-instructions.md, read from the default branch and
+# never from the pull request.
 #
 # A pull request opened ready gets one round unasked. One opened as a draft gets it when it is
 # marked ready. Every round after that is asked for by putting the ai-review label back on.
@@ -28,7 +29,7 @@ jobs:
       pull-requests: write
       checks: read
       actions: read
-    uses: eriksaulnier/loupe-workflows/.github/workflows/review.yml@fc789c0d943821bde48b7d88aa7c6ff840a9762c # v2.2.0
+    uses: secondshift-labs/ai-review-workflows/.github/workflows/review.yml@7555c6d3a60770f51675129936ccff7e8677a83c # v3.0.0
     with:
       pull_request: ${{ inputs.pull_request || github.event.pull_request.number }}
       model: ${{ vars.REVIEW_MODEL }}
@@ -38,8 +39,8 @@ jobs:
       # no review at all.
       max_turns: 80
       # loupe dogfoods its own sticky review. Sticky finds the review to edit by its source name, so
-      # the name is set here and MUST NOT change: the next loupe-workflows release derives a longer
-      # default, and a changed name would leave every open series behind and post a second review.
+      # the name MUST NOT change: a changed name would leave every open series behind and post a
+      # second review.
       source: loupe-ci
       sticky: true
     secrets:

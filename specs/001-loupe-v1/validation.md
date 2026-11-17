@@ -88,6 +88,13 @@ The Ghostty handoff (specs/045-tmux-iterm-panes FR-019 to FR-022), run on 2026-1
 - That first handoff left focus on the new terminal. The split script then held the agent's terminal as a loop item, which AppleScript resolves by index, and after the split the index named the new terminal. With the terminal held by id, a handoff of `acme/widgets#43` left focus on the agent's terminal.
 - With another application in front, a handoff of `acme/widgets#44` opened the split, Ghostty's `frontmost` stayed `false` afterward, and focus inside Ghostty stayed on the new terminal, as FR-021 has it when `focus` is skipped.
 
+The rebuilt reviewer (specs/058-ci-workflows migration step 4), run between 00:05 and 00:37 UTC on 2026-11-17 on `eriksaulnier/loupe-probe#1`, branch `probe/format-evidence`, with `source: loupe-v3-probe` and `sticky: true`. All four rounds are in review 5930233047:
+
+- Rounds 1 and 2, on the v3 branch of `loupe-workflows` at `7aab4d7`: round 1 posted the review, and round 2 edited it in place. The `ai-review` label was gone after each round.
+- Round 3, after a rollback to the v2.2.0 pin `fc789c0`, edited the same review.
+- Round 4, back on v3 at `740f5e9` (the lock fix), edited it again.
+- Neither v3 commit is the v3.0.0 release commit `7555c6d`, which was squash-merged afterward. At `7555c6d` itself, on 2026-11-17, loupe's own caller ran a second round on `secondshift-labs/loupe#156` (run 44010883769, `source: loupe-ci`, `sticky: true`). It edited round 1's review 5932291712 in place, the pull request still had one review, and the label was gone afterward.
+
 ## Unverified
 
 These cannot be checked in this repository and remain for the owner:
@@ -99,7 +106,6 @@ These cannot be checked in this repository and remain for the owner:
 - A live `loupe review` on a pull request that merges while review is open, which SHOULD show `PR merged` within about 80 seconds, and the publish confirmation that follows. This checks that GitHub sends `merged` on the single pull request (specs/050-pr-state-awareness).
 - Installing a release binary on a clean machine.
 - The acceptance run of the starter file in `docs/ci-action.md` on `eriksaulnier/loupe-probe#1` (specs/058-ci-workflows item 20): one COMMENT review posts, marked unattended, adding the `ai-review` label again edits that review in a second round, and the label is gone after each round.
-- The rebuilt `loupe-workflows` on `eriksaulnier/loupe-probe#1` (specs/058-ci-workflows migration step 4): two sticky rounds, then a rollback to the old pin. Round 2 MUST edit round 1's review, and the old pin's next round MUST still edit it.
 - Loading the plugin in Claude Code.
 - A live review round in Codex and in Pi (specs/004-agent-hosts FR-008, specs/006-agent-plugins FR-025): capture, review, wait and a send-back note on a pull request the owner names, with the plugin installed from GitHub by the README's `codex plugin` and `pi install git:` commands. On 2026-09-15, with a scratch `CODEX_HOME` and `PI_CODING_AGENT_DIR` on macOS, `codex plugin marketplace add` and `codex plugin add loupe@loupe` installed the plugin from a local checkout with both skills in its cache, and `pi install` of the checkout listed `skill:loupe` and `skill:loupe-handoff` over RPC, before the two skills were folded into one. Not observed: installing either from GitHub, Codex listing the skills in a session, the round itself, Codex's escalation prompts, and `loupe wait` under Codex's shell timeout.
 - A multi-hour `loupe wait` under a persistent Claude Code Monitor, and the session waking when it prints.

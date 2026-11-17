@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.2](https://github.com/secondshift-labs/loupe/compare/v0.25.1...v0.25.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **ci:** hold the starter's lock from capture through publish ([#153](https://github.com/secondshift-labs/loupe/issues/153)) ([f73bc2a](https://github.com/secondshift-labs/loupe/commit/f73bc2ae71b642b0ddb15e6727945282640fdca3))
+
 ## [0.25.1](https://github.com/secondshift-labs/loupe/compare/v0.25.0...v0.25.1) (2026-11-16)
 
 

@@ -82,6 +82,21 @@ on:
 
 permissions: {}
 
+# One round at a time per pull request, from capture through publish: a round that captured while the one before
+# it was still publishing would assess a stale previous round, and its publish would refuse with previous-moved.
+# GitHub keeps one waiting run per group, so a run the review job's if turns away gets a group of its own and
+# cannot cancel a round waiting its turn. The condition here MUST match that if.
+concurrency:
+  group: >-
+    ${{ (github.event_name == 'workflow_dispatch' ||
+    (github.event.action == 'labeled' && github.event.label.name == 'ai-review') ||
+    (github.event.action != 'labeled' && !github.event.pull_request.draft &&
+    !startsWith(github.head_ref, 'release-please--') &&
+    !endsWith(github.event.pull_request.user.login, '[bot]')))
+    && format('loupe-review-{0}', inputs.pull_request || github.event.pull_request.number)
+    || format('loupe-review-turned-away-{0}', github.run_id) }}
+  cancel-in-progress: false
+
 jobs:
   review:
     # Policy: edit freely. A label or a dispatch overrides the automatic skips.
@@ -94,11 +109,6 @@ jobs:
     runs-on: ubuntu-latest
     # Up to 10 minutes of waiting for checks, plus the agent's own time.
     timeout-minutes: 30
-    # On the job, not the workflow: only runs that pass the if above take a place, so an unrelated label cannot
-    # cancel a round that is waiting its turn.
-    concurrency:
-      group: loupe-review-${{ inputs.pull_request || github.event.pull_request.number }}
-      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read

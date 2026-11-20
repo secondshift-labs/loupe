@@ -444,7 +444,11 @@ func SetSummary(d *Draft, summary, verdict string, expectFindings *int, by strin
 			return r
 		}
 	}
-	d.Summary, d.Verdict = summary, verdict
+	d.Summary = summary
+	// The verdict is the agent's view of the round: its call replaces it, and a human rewording the summary keeps it.
+	if by == ByAgent {
+		d.Verdict = verdict
+	}
 	return nil
 }
 

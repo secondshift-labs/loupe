@@ -40,9 +40,9 @@ agent learns which of its findings did not land.
 approve or request-changes. It sets only where the publish step of loupe review starts, and
 the human's decisions override it there: an accepted blocking finding turns approve into
 request-changes, and request-changes with no blocking finding left turns into comment. It never
-sets the action that is published. Each call sets the summary and the verdict together, so a
-call without a verdict clears the one before. A local run takes no verdict, and neither does
---by human.
+sets the action that is published. Each agent call sets the summary and the verdict together,
+so a call without a verdict clears the one before. A --by human call cannot set one and keeps
+the agent's. A local run takes no verdict.
 
 Result (--json):
   {"loupe": 1, "ok": true, "command": "summary", "run": "owner/repo#123@1",

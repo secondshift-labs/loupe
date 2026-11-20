@@ -145,3 +145,18 @@ func TestSummaryInputVerdictRefusesAnUnreadableTarget(t *testing.T) {
 	code, s := runWithStdin(t, home, `{"summary": "x", "verdict": "approve"}`, "summary", "--run", "o/r#1", "--from", "-", "--expect-findings", "2", "--json")
 	wantCode(t, code, s, refusal.Record)
 }
+
+func TestSummaryByHumanKeepsTheAgentsVerdict(t *testing.T) {
+	home, dir := sendBackRun(t)
+	for _, args := range [][]string{
+		{"--body", "x", "--verdict", "approve", "--expect-findings", "2"},
+		{"--body", "Reworded by hand.", "--by", "human"},
+	} {
+		if code, s := runWithStdin(t, home, "", append([]string{"summary", "--run", "o/r#1"}, args...)...); code != 0 {
+			t.Fatalf("%v: exit %d stderr %q", args, code, s.stderr.String())
+		}
+	}
+	if d, err := draft.Load(dir); err != nil || d.Verdict != "approve" || d.Summary != "Reworded by hand." {
+		t.Fatalf("summary %q verdict %q err %v", d.Summary, d.Verdict, err)
+	}
+}

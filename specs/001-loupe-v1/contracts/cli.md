@@ -166,7 +166,7 @@ Input: `{"summary": "Markdown", "verdict": "approve"}`, with `verdict` optional.
 
 The summary orients the human while they sort findings, and is the opening prose of an unattended publication. An attended publication does not post it: the human types the review's opening at the confirmation instead (specs/013-human-message).
 
-`--verdict`, or `"verdict"` in the input, records the action the agent would publish with: `comment`, `approve` or `request-changes`. It sets only where the publish step of `loupe review` starts, and the human's decisions override it there. It never sets the action that is published, and `loupe publish --action` stays required. Each `summary` call sets the summary and the verdict together, so a call without a verdict clears the stored one. A new round starts with none (`specs/059-recommended-verdict`). Each refusal leaves the draft unchanged:
+`--verdict`, or `"verdict"` in the input, records the action the agent would publish with: `comment`, `approve` or `request-changes`. It sets only where the publish step of `loupe review` starts, and the human's decisions override it there. It never sets the action that is published, and `loupe publish --action` stays required. Each `summary` call by the agent sets the summary and the verdict together, so a call without a verdict clears the stored one. A `--by human` call cannot set a verdict and keeps the stored one. A new round starts with none (`specs/059-recommended-verdict`). Each refusal leaves the draft unchanged:
 
 | Case | Code | Message | Fix |
 | :--- | :--- | :--- | :--- |

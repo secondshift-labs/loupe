@@ -602,3 +602,14 @@ func TestAddWithDefaultRulesRefusesOptions(t *testing.T) {
 		t.Fatalf("message %q fix %q", r.Message, r.Fix)
 	}
 }
+
+// The verdict is the agent's, so a human rewording the summary keeps it.
+func TestSetSummaryByHumanKeepsTheVerdict(t *testing.T) {
+	d := NewEmpty()
+	if err := SetSummary(d, "Ready.", "approve", nil, ByAgent); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetSummary(d, "Reworded by hand.", "", nil, ByHuman); err != nil || d.Verdict != "approve" || d.Summary != "Reworded by hand." {
+		t.Fatalf("summary %q verdict %q err %v", d.Summary, d.Verdict, err)
+	}
+}

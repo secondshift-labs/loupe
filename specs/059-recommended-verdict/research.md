@@ -44,7 +44,8 @@ Spec 059 left no open marker. Each decision below settles how a requirement maps
 ## D8. Local runs
 
 - **Decision**: `--verdict` on a local run refuses through `mode.apply.Refuses`, which gains a `summary` case for the `verdict` flag: `wrong-mode`, message `loupe summary --verdict applies only to pull request runs`, fix `run loupe summary without --verdict`. A `"verdict"` key on a local run refuses in `runSummary` after the run resolves: `input`, message `input field "verdict" does not apply to local runs`, fix `drop "verdict" from the input`.
-- **Rationale**: `resolveRunRoot` already sends every local-run command through `Refuses` with its changed flags, as `show --previous` does. The JSON key needs the decoded input, so it is checked where the input is read. `checkModeKeys` covers finding input only, and one key on one command does not justify a new `InputRules` field.
+- **Rationale**: `resolveRunRoot` already sends every local-run command through `Refuses` with its changed flags, as `show --previous` does. The JSON key needs the decoded input, so it is checked where the input is read, through a new `InputRules.RefuseVerdict`.
+- **Amended during implementation**: the plan first checked `target.Kind` in `runSummary`. `TestOnlyTheModeSeamsNameTheLocalKind` keeps run-kind checks inside `internal/mode`, so the key check asks the mode's `InputRules` instead.
 
 ## D9. Clearing and `--by human`
 

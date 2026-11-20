@@ -10,6 +10,7 @@ import (
 	"github.com/secondshift-labs/loupe/internal/draft"
 	"github.com/secondshift-labs/loupe/internal/refusal"
 	"github.com/secondshift-labs/loupe/internal/run"
+	"github.com/secondshift-labs/loupe/internal/testutil/refusaltest"
 )
 
 func localTarget(capture string) run.Target {
@@ -44,7 +45,7 @@ func TestInputRules(t *testing.T) {
 	if got := Of(run.Target{}).InputRules(); got != (InputRules{}) {
 		t.Fatalf("publish input rules %+v", got)
 	}
-	want := InputRules{RefuseBlocking: true, RefuseSide: true, RefuseSuggestedFix: true}
+	want := InputRules{RefuseBlocking: true, RefuseSide: true, RefuseSuggestedFix: true, RefuseVerdict: true}
 	if got := Of(localTarget("changed")).InputRules(); got != want {
 		t.Fatalf("apply input rules %+v", got)
 	}
@@ -61,6 +62,7 @@ func TestApplyRefusesPRCommands(t *testing.T) {
 		{"assess", nil},
 		{"show", []string{"previous"}},
 		{"show", []string{"json", "comments"}},
+		{"summary", []string{"body", "verdict"}},
 	} {
 		err := m.Refuses(c.command, c.flags)
 		r, ok := refusal.As(err)
@@ -79,10 +81,17 @@ func TestApplyRefusesPRCommands(t *testing.T) {
 	}
 }
 
+func TestApplyRefusesSummaryVerdict(t *testing.T) {
+	r := refusaltest.Want(t, Of(localTarget("changed")).Refuses("summary", []string{"verdict"}), refusal.WrongMode)
+	if r.Message != "loupe summary --verdict applies only to pull request runs" || r.Fix != "run loupe summary without --verdict" {
+		t.Fatalf("message %q fix %q", r.Message, r.Fix)
+	}
+}
+
 func TestPublishRefusesNothing(t *testing.T) {
 	m := Of(run.Target{})
-	for _, c := range []string{"publish", "assess", "show", "review", "handoff", "add", "edit", "wait", "feedback"} {
-		if err := m.Refuses(c, []string{"previous", "comments"}); err != nil {
+	for _, c := range []string{"publish", "assess", "show", "review", "handoff", "add", "edit", "wait", "feedback", "summary"} {
+		if err := m.Refuses(c, []string{"previous", "comments", "verdict"}); err != nil {
 			t.Errorf("%s: %v", c, err)
 		}
 	}

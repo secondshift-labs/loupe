@@ -25,11 +25,15 @@ A disposition is accepted, pending, excluded or withdrawn. Readiness holds when 
 pending and no note is open. The digest is the SHA-256 of the publishable set, the value that
 will appear in the published review's hidden marker.
 
+verdict is the action the agent recommended with loupe summary --verdict, and is absent when it
+gave none.
+
 Result (--json):
   {"loupe": 1, "ok": true, "command": "show", "run": "owner/repo#123@1",
    "dir": "/path/to/run", "version": 5,
    "schema": 4,
    "summary": "Markdown",
+   "verdict": "approve",
    "findings": [{"id": "f-001", "rev": 1, "title": "...", "body": "...",
                  "location": {"path": "src/a.go", "side": "RIGHT", "line": 88},
                  "general": false, "label": "issue", "blocking": true, "by": "agent",
@@ -184,6 +188,9 @@ func runShow(cmd *cobra.Command, deps Deps) error {
 			"dispositions": dispositions,
 			"readiness":    readiness,
 			"digest":       draft.Digest(d),
+		}
+		if d.Verdict != "" {
+			payload["verdict"] = d.Verdict
 		}
 		// The keys appear only once something was assessed, as they do in the draft on disk.
 		if len(d.Assessments) > 0 {

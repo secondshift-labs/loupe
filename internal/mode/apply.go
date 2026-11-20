@@ -20,7 +20,7 @@ func (a apply) Rules() draft.Rules {
 }
 
 func (apply) InputRules() InputRules {
-	return InputRules{RefuseBlocking: true, RefuseSide: true, RefuseSuggestedFix: true}
+	return InputRules{RefuseBlocking: true, RefuseSide: true, RefuseSuggestedFix: true, RefuseVerdict: true}
 }
 
 const wrongModeFix = "on a local run, return the decisions from loupe review, and read them with loupe feedback"
@@ -34,6 +34,10 @@ func (apply) Refuses(command string, flags []string) error {
 			if slices.Contains(flags, flag) {
 				return refusal.New(refusal.WrongMode, fmt.Sprintf("loupe show --%s applies only to pull request runs", flag), "run loupe show without --"+flag)
 			}
+		}
+	case "summary":
+		if slices.Contains(flags, "verdict") {
+			return refusal.New(refusal.WrongMode, "loupe summary --verdict applies only to pull request runs", "run loupe summary without --verdict")
 		}
 	}
 	return nil

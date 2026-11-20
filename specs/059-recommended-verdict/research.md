@@ -51,3 +51,9 @@ Spec 059 left no open marker. Each decision below settles how a requirement maps
 
 - **Decision**: `SetSummary` always assigns the verdict, so an empty one clears it (FR-004). `runSummary` refuses `usage` for a verdict with `--by human` before it resolves the run, fix `drop --verdict; the human picks the action in loupe review`. The same refusal applies to the JSON key.
 - **Rationale**: both are usage errors that need no run state, and Principle V asks that `--help` and usage refusals work without one.
+
+## D10. The step after the owner saw it (supersedes D5 and D6)
+
+- **Decision**: the reason goes on the agent's row, after `recommended` and the separator, in place of the description. The separate reason rows under the choices and the code that shortened them are gone. `publish.Unavailable` returns a short reason for any refused action (`your own pull request`, `f-002 is blocking`), and every unavailable row shows it after `unavailable` in place of the whole refusal. `blockingPhrase` names at most three ids, or two and a count. `pickerRow` takes a `pickerText` so the lead word and the text each carry a tone: `recommended` good, an override's reason warn, and the rest secondary. The descriptions are shortened so no row wraps at 80 columns.
+- **Rationale**: the owner found the first build very cluttered (2026-11-20). The blocking ids showed on the approve row and again on the reason line, and the full refusal wrapped. One row per action that says what it is or why it is not available reads at a glance, and the cursor's choice can no longer be pushed off screen by a long reason.
+- **Alternatives**: keep the reason line and only deduplicate it, or move the recommendation to a header line under the tabs. The owner picked the row.

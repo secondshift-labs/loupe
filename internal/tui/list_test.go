@@ -126,17 +126,12 @@ func TestPublishStepsShowTabsAndPanes(t *testing.T) {
 		}
 	}
 
-	// At the narrowest window the refusal wraps under the description column instead of being clipped.
+	// At the narrowest window each unavailable row still says why, wrapped under the description column.
 	narrow := modelOf(t, dir, map[string]string{"NO_COLOR": "1", "LANG": "en_US.UTF-8"}, 60, 24)
 	narrow.view, narrow.pick = viewAction, 0
 	joined := paneText(narrow.View().Content)
-	for _, want := range []string{
-		"unavailable: author is the author of this pull request and cannot approve it",
-		"unavailable: author is the author of this pull request and cannot request changes on it",
-	} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("60-column step 1 lacks %q:\n%s", want, narrow.View().Content)
-		}
+	if want := "unavailable " + narrow.glyphs.Sep + " your own pull request"; strings.Count(joined, want) != 2 {
+		t.Errorf("60-column step 1 does not say twice %q:\n%s", want, narrow.View().Content)
 	}
 }
 

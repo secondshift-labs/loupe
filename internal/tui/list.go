@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/secondshift-labs/loupe/internal/draft"
 	"github.com/secondshift-labs/loupe/internal/publish"
@@ -106,9 +107,9 @@ func (m *Model) updateInline(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 var actionDescriptions = map[string]string{
-	"comment":         "post the findings without a verdict",
-	"approve":         "post the findings and approve the pull request",
-	"request-changes": "post the findings and request changes",
+	"comment":         "post findings, no verdict",
+	"approve":         "post findings and approve",
+	"request-changes": "post findings and request changes",
 }
 
 func (m *Model) actionView() string {
@@ -116,20 +117,23 @@ func (m *Model) actionView() string {
 	var picked [2]int
 	for i, action := range publish.Actions {
 		start := len(rows)
-		mark := ""
-		if action == m.draft.Verdict {
-			mark = "recommended " + m.glyphs.Sep + " "
+		unavailable := publish.Unavailable(action, m.target.Viewer, m.target.Author, m.draft)
+		text := pickerText{text: actionDescriptions[action]}
+		switch {
+		case action == m.draft.Verdict && m.startWhy != "":
+			// The agent's row says why the cursor is elsewhere, so the step needs no line of its own for it.
+			text = pickerText{lead: "recommended", leadKind: style.Good, text: m.startWhy, textKind: style.Warn}
+		case action == m.draft.Verdict:
+			text.lead, text.leadKind = "recommended", style.Good
+		case unavailable != "":
+			text = pickerText{lead: "unavailable", text: unavailable}
 		}
-		if r, ok := refusal.As(m.actionRefusal(action)); ok {
-			rows = append(rows, m.pickerRow(false, true, action, mark+"unavailable: "+r.Message, m.popupInner())...)
-		} else {
-			rows = append(rows, m.pickerRow(i == m.pick, false, action, mark+actionDescriptions[action], m.popupInner())...)
-		}
+		rows = append(rows, m.pickerRow(i == m.pick && unavailable == "", unavailable != "", action, text, m.popupInner())...)
 		if i == m.pick {
 			picked = [2]int{start, len(rows)}
 		}
 	}
-	return m.publishStep(0, rows, picked, actionEnter, m.startWhy)
+	return m.publishStep(0, rows, picked, actionEnter)
 }
 
 var inlineDescriptions = map[string]string{
@@ -143,12 +147,12 @@ func (m *Model) inlineView() string {
 	var picked [2]int
 	for i, mode := range publish.InlineModes {
 		start := len(rows)
-		rows = append(rows, m.pickerRow(i == m.pick, false, mode, inlineDescriptions[mode], m.popupInner())...)
+		rows = append(rows, m.pickerRow(i == m.pick, false, mode, pickerText{text: inlineDescriptions[mode]}, m.popupInner())...)
 		if i == m.pick {
 			picked = [2]int{start, len(rows)}
 		}
 	}
-	return m.publishStep(1, rows, picked, inlineEnter, "")
+	return m.publishStep(1, rows, picked, inlineEnter)
 }
 
 // publishSteps are the tabs over every publish screen. They label where the flow is and add no key.
@@ -157,8 +161,8 @@ var publishSteps = []string{"Action", "Inline comments", "Message"}
 // publishStep is one choice step, a popup over the dimmed list: the step tabs, then the choices, in a pane whose
 // border says nothing has been sent. The footer says what enter does next. The step that writes the message and shows
 // the whole review is a screen of its own, since it needs the room. picked is the selected choice's rows, which stay
-// in view however short the window. why, when set, sits under the choices and is kept whole, as a refusal is.
-func (m *Model) publishStep(step int, rows []string, picked [2]int, enter, why string) string {
+// in view however short the window.
+func (m *Model) publishStep(step int, rows []string, picked [2]int, enter string) string {
 	footer := m.keys(groupHints(m.publishStepHints(enter))...)
 	width, inner := m.popupWidth(), m.popupInner()
 	room := noticeRoom(width, "")
@@ -169,17 +173,6 @@ func (m *Model) publishStep(step int, rows []string, picked [2]int, enter, why s
 	// The popup is as tall as its rows, up to the body; the refusal is kept whole, and the rows above give way to it.
 	maxRows := m.height - len(footer) - m.bodyTop() - style.PaneRows
 	notice := m.noticeRows(inner, room)
-	if why != "" {
-		reason := strings.Split(m.styles.Wrap(render.ForDisplay(why), inner, ""), "\n")
-		for i, l := range reason {
-			reason[i] = m.styles.Secondary().Render(l)
-		}
-		// The reason never pushes the cursor's choice off screen, or enter would pick an action the human cannot see.
-		if keep := maxRows - len(notice) - 1 - (picked[1] - picked[0]); len(reason) > keep {
-			reason = m.shortenNotice(reason, max(1, keep))
-		}
-		notice = append(reason, notice...)
-	}
 	// Blank rows around the steps and above the border give them room. The current step's block marks the focus, so
 	// the title stays plain rather than a second block on top of it.
 	tabs := m.styles.Tabs(publishSteps, step)
@@ -232,9 +225,17 @@ func (m *Model) publishStepHints(enter string) []style.Hint {
 // pickerIndent is where a choice's description starts, and where its wrapped lines continue.
 const pickerIndent = 19
 
+// pickerText is a choice's description: an optional lead word in its own tone, the separator, then the text. A Plain
+// kind draws its part in the secondary tone.
+type pickerText struct {
+	lead               string
+	leadKind, textKind style.Kind
+	text               string
+}
+
 // pickerRow is the cursor, the name and the description, wrapped under the description's column so a refusal reason
 // is never clipped.
-func (m *Model) pickerRow(selected, disabled bool, name, description string, inner int) []string {
+func (m *Model) pickerRow(selected, disabled bool, name string, desc pickerText, inner int) []string {
 	cursor := " "
 	nameStyle := m.styles.Text()
 	switch {
@@ -243,10 +244,27 @@ func (m *Model) pickerRow(selected, disabled bool, name, description string, inn
 	case selected:
 		cursor, nameStyle = m.styles.Emphasis(m.styles.Cursor).Render(m.styles.PickerCursor()), m.styles.Emphasis(m.styles.Accent)
 	}
+	tone := func(k style.Kind) lipgloss.Style {
+		if k == style.Plain {
+			return m.styles.Secondary()
+		}
+		return m.styles.Of(k)
+	}
+	lead := ""
+	if desc.lead != "" {
+		lead = desc.lead + " " + m.glyphs.Sep + " "
+	}
 	indent := strings.Repeat(" ", pickerIndent)
-	lines := strings.Split(m.styles.Wrap(render.ForDisplay(description), inner, indent), "\n")
+	lines := strings.Split(m.styles.Wrap(render.ForDisplay(lead+desc.text), inner, indent), "\n")
 	for i, l := range lines {
-		lines[i] = indent + m.styles.Secondary().Render(strings.TrimPrefix(l, indent))
+		l = strings.TrimPrefix(l, indent)
+		if i == 0 && lead != "" && strings.HasPrefix(l, lead) {
+			l = tone(desc.leadKind).Render(desc.lead) + m.styles.Secondary().Render(" "+m.glyphs.Sep+" ") +
+				tone(desc.textKind).Render(strings.TrimPrefix(l, lead))
+		} else {
+			l = tone(desc.textKind).Render(l)
+		}
+		lines[i] = indent + l
 	}
 	lines[0] = cursor + " " + nameStyle.Render(style.Pad(name, pickerIndent-3)) + " " + strings.TrimPrefix(lines[0], indent)
 	return lines

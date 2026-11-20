@@ -261,23 +261,23 @@ func TestStartAction(t *testing.T) {
 		{"approve", "approve", reviewer, verdictDraft("", ""), "approve", ""},
 		{"approve with no findings", "approve", reviewer, draft.NewEmpty(), "approve", ""},
 		{"approve, blocking accepted", "approve", reviewer, verdictDraft("accepted", ""), "request-changes",
-			"agent recommended approve; f-002 is blocking"},
+			"f-002 is blocking"},
 		{"approve, two blocking accepted", "approve", reviewer, verdictDraft("accepted", "accepted"), "request-changes",
-			"agent recommended approve; f-002, f-005 are blocking"},
+			"f-002, f-005 are blocking"},
 		{"approve, blocking excluded", "approve", reviewer, verdictDraft("excluded", ""), "approve", ""},
 		{"approve, blocking withdrawn", "approve", reviewer, verdictDraft("withdrawn", ""), "approve", ""},
 		{"approve, blocking unblocked", "approve", reviewer, verdictDraft("unblocked", ""), "approve", ""},
 		{"request-changes, blocking accepted", "request-changes", reviewer, verdictDraft("accepted", ""), "request-changes", ""},
 		{"request-changes, blocking excluded", "request-changes", reviewer, verdictDraft("excluded", ""), "comment",
-			"agent recommended request-changes; no published finding is blocking"},
+			"no published finding is blocking"},
 		{"request-changes, nothing blocking", "request-changes", reviewer, verdictDraft("", ""), "comment",
-			"agent recommended request-changes; no published finding is blocking"},
+			"no published finding is blocking"},
 		{"own pull request, approve", "approve", author, verdictDraft("", ""), "comment",
-			"agent recommended approve; you authored this pull request"},
+			"your own pull request"},
 		{"own pull request, approve, blocking accepted", "approve", author, verdictDraft("accepted", ""), "comment",
-			"agent recommended approve; you authored this pull request"},
+			"your own pull request"},
 		{"own pull request, request-changes", "request-changes", author, verdictDraft("accepted", ""), "comment",
-			"agent recommended request-changes; you authored this pull request"},
+			"your own pull request"},
 		{"own pull request, comment", "comment", author, verdictDraft("accepted", ""), "comment", ""},
 	}
 	for _, tc := range cases {
@@ -304,6 +304,36 @@ func TestStartActionIsAlwaysAvailable(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestUnavailableIsShort(t *testing.T) {
+	d := readyDraft()
+	for _, c := range []struct{ action, viewer, want string }{
+		{"comment", "author", ""},
+		{"approve", "reviewer", "f-001 is blocking"},
+		{"request-changes", "reviewer", ""},
+		{"approve", "author", "your own pull request"},
+		{"request-changes", "author", "your own pull request"},
+	} {
+		if got := Unavailable(c.action, c.viewer, "author", d); got != c.want {
+			t.Errorf("%s by %s: %q, want %q", c.action, c.viewer, got, c.want)
+		}
+	}
+}
+
+func TestBlockingPhraseStaysShort(t *testing.T) {
+	for _, c := range []struct {
+		ids  []string
+		want string
+	}{
+		{[]string{"f-001"}, "f-001 is blocking"},
+		{[]string{"f-001", "f-002", "f-003"}, "f-001, f-002, f-003 are blocking"},
+		{[]string{"f-001", "f-002", "f-003", "f-004", "f-005"}, "f-001, f-002 and 3 more are blocking"},
+	} {
+		if got := blockingPhrase(c.ids); got != c.want {
+			t.Errorf("%v: %q, want %q", c.ids, got, c.want)
 		}
 	}
 }

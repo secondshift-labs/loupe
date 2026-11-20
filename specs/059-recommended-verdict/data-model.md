@@ -22,7 +22,7 @@ The schema table in `internal/publish/schema_test.go` gains an `8:` entry: the s
 | Value | Derived from | Read by |
 | :--- | :--- | :--- |
 | Start | `verdict`, `draft.PublishableSet`, and the viewer and author recorded at capture, through `publish.StartAction` | The action step, each time `p` opens it from the list |
-| Reason (`why`) | The same call. Empty when the start equals the verdict | The action step's reason row |
+| Reason (`why`) | The same call. A few words, empty when the start equals the verdict | The verdict's row in the action step |
 
 ```mermaid
 stateDiagram-v2

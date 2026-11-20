@@ -12,11 +12,11 @@ Run these from the worktree after `mise run build`. Inside the repository, `loup
 
 ## By eye, through tmux
 
-1. `mise run demo -- review 'acme/widgets#43'`. The demo seeds the verdict `approve`, and the blocking finding is accepted. Press `p`. The cursor is on `request-changes`. The `approve` row opens with `recommended ·`, and the reason row reads `agent recommended approve; f-002 is blocking`.
-2. Press esc, open `f-002`, exclude it, and press `p` again. The cursor is on `approve`, and no reason row shows.
+1. `mise run demo -- review 'acme/widgets#43'`. The demo seeds the verdict `approve`, and the blocking finding is accepted. Press `p`. The cursor is on `request-changes`. The `approve` row reads `recommended · f-002 is blocking`, and no other line repeats the id.
+2. Press esc, open `f-002`, exclude it, and press `p` again. The cursor is on `approve`, and its row reads `recommended · post findings and approve`.
 3. Press `j`, then enter, then esc. The cursor is back on the action the human chose, not on the start.
 4. `mise run demo -- summary --run 'acme/widgets#42' --body x --verdict approve --by human`. Expect `usage` and the fix `drop --verdict; the human picks the action in loupe review`.
-5. Repeat step 1 with `NO_COLOR=1` and at 80×24. The mark and the reason read without color, and the reason row stays whole while the cursor's choice still fits.
+5. Repeat step 1 with `NO_COLOR=1` and at 80×24. The mark and the reason read without color, and no row wraps.
 
 ## Not covered here
 

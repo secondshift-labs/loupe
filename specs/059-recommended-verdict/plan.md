@@ -34,7 +34,7 @@ The agent passes `--verdict` or `"verdict"` to `loupe summary`. `runSummary` che
 
 - A run with no verdict draws the action step byte for byte as today (SC-004).
 - The blocking set has one source (FR-007).
-- The reason row is never cut so that an id is lost (Edge Cases).
+- No action row wraps at 80 columns (FR-010a, after the owner's demo review). `research.md` D10 supersedes the reason-row design of D5 and D6.
 
 **Scale/Scope**: about 110 production lines and the tests, help, contract, skill and demo changes in the Files table.
 
@@ -115,7 +115,7 @@ flowchart LR
 1. `publish`: `blockingIDs`, then `StartAction` and its table, failing test first.
 2. `draft`: the field, the schema bump, `SetSummary`, and the schema test.
 3. `cli` and `mode`: the flag, the input field, the refusals, `show --json`, help and goldens.
-4. `tui`: the start, the mark and the reason row, with view and key tests.
+4. `tui`: the start, the mark and the reason on the agent's row, with view and key tests.
 5. Demo seed, skill, contracts and `versioning.md`.
 6. `mise run check`, then the by-eye pass in [quickstart.md](quickstart.md).
 

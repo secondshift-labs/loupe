@@ -83,7 +83,7 @@ The cursor starts in the review's opening. Type it in your own words and press E
 
 Only accepted findings are published. One confirmation sends exactly one GitHub request. `--action` picks `comment`, `approve` or `request-changes`. `--inline` also turns located findings into inline comments.
 
-In `loupe review`, the action step starts on the agent's verdict and marks it `recommended`. Your decisions win over it. An accepted blocking finding starts an `approve` on `request-changes`, a `request-changes` with nothing blocking left starts on `comment`, and an action you cannot take starts on `comment`. A line under the choices says why. Without a verdict the step starts on `comment`.
+In `loupe review`, the action step starts on the agent's verdict and marks it `recommended`. Your decisions win over it. An accepted blocking finding starts an `approve` on `request-changes`, a `request-changes` with nothing blocking left starts on `comment`, and an action you cannot take starts on `comment`. The agent's row says why, as `recommended · f-002 is blocking`. Without a verdict the step starts on `comment`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/review-dark.png">

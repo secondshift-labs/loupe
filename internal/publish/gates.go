@@ -316,37 +316,52 @@ func blockingIDs(d *draft.Draft) []string {
 }
 
 // StartAction is where the publish step's cursor starts: the agent's verdict, unless the human's decisions contradict
-// it or the action is refused. why says what moved the start off the verdict, and is empty when nothing did.
+// it or the action is refused. why says in a few words what moved the start off the verdict, and is empty when
+// nothing did.
 func StartAction(verdict, viewer, author string, d *draft.Draft) (action, why string) {
 	if !slices.Contains(Actions, verdict) {
 		return "comment", ""
 	}
 	action = verdict
-	blocking := blockingIDs(d)
-	switch {
+	switch blocking := blockingIDs(d); {
 	case verdict == "approve" && len(blocking) > 0:
-		verb := "is"
-		if len(blocking) > 1 {
-			verb = "are"
-		}
-		action, why = "request-changes", fmt.Sprintf("%s %s blocking", strings.Join(blocking, ", "), verb)
+		action, why = "request-changes", blockingPhrase(blocking)
 	case verdict == "request-changes" && len(blocking) == 0:
 		action, why = "comment", "no published finding is blocking"
 	}
-	if err := ActionRefusal(action, viewer, author, d); err != nil {
-		why = err.Error()
-		if r, ok := refusal.As(err); ok {
-			why = r.Message
-			if r.Code == refusal.OwnPR {
-				why = "you authored this pull request"
-			}
-		}
-		action = "comment"
+	if refused := Unavailable(action, viewer, author, d); refused != "" {
+		action, why = "comment", refused
 	}
-	if why == "" {
-		return action, ""
+	return action, why
+}
+
+// Unavailable says in a few words why the publish step refuses action, or "" when it does not. ActionRefusal holds
+// the whole refusal and its fix, which the step shows when the human picks the action anyway.
+func Unavailable(action, viewer, author string, d *draft.Draft) string {
+	err := ActionRefusal(action, viewer, author, d)
+	r, ok := refusal.As(err)
+	switch {
+	case err == nil:
+		return ""
+	case !ok:
+		return err.Error()
+	case r.Code == refusal.OwnPR:
+		return "your own pull request"
+	case r.Code == refusal.Blocking:
+		return blockingPhrase(blockingIDs(d))
 	}
-	return action, fmt.Sprintf("agent recommended %s; %s", verdict, why)
+	return r.Message
+}
+
+// blockingPhrase names at most three ids, so a step row stays one line however many findings block.
+func blockingPhrase(ids []string) string {
+	if len(ids) == 1 {
+		return ids[0] + " is blocking"
+	}
+	if len(ids) > 3 {
+		return fmt.Sprintf("%s and %d more are blocking", strings.Join(ids[:2], ", "), len(ids)-2)
+	}
+	return strings.Join(ids, ", ") + " are blocking"
 }
 
 func ReadinessRefusal(d *draft.Draft) error { return draft.ReadinessRefusal(d) }

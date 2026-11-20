@@ -237,7 +237,13 @@ func TestCaptureScriptRunsWithoutAPreviousHead(t *testing.T) {
 // loupe capture alone.
 func (f *captureFixture) assertReviewed(t *testing.T, out map[string]string) {
 	t.Helper()
-	review := filepath.Join(f.repo.Dir, "review")
+	// The script prints its working directory, which sh resolves when the inherited PWD names another directory: on
+	// macOS the temporary directory is under the /var symlink.
+	dir, err := filepath.EvalSymlinks(f.repo.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	review := filepath.Join(dir, "review")
 	want := map[string]string{"run": "o/r#3@2", "head": f.repo.HeadSHA(), "review_dir": review}
 	for k, v := range want {
 		if out[k] != v {

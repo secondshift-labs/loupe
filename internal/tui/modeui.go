@@ -152,7 +152,7 @@ func (publishUI) detailKey(m *Model, f draft.Finding, key string) (tea.Cmd, bool
 }
 
 func (publishUI) heading(m *Model) style.ReviewHeading {
-	return style.ReviewHeading{Ref: m.ref(), URL: m.target.URL, Round: m.target.Round}
+	return style.ReviewHeading{Ref: m.ref(), URL: m.target.URL, Author: m.target.Author, Round: m.target.Round}
 }
 
 func (publishUI) runRef(m *Model) string { return fmt.Sprintf("%s@%d", m.ref(), m.target.Round) }

@@ -812,6 +812,8 @@ func (s Style) keyHint(h Hint) string {
 // request, linked only when Link accepts it.
 type ReviewHeading struct {
 	Ref, URL string
+	// Author is the pull request author's login, already sanitized for display; empty for none.
+	Author   string
 	Round    int
 	Title    string
 	Progress []ProgressState
@@ -838,9 +840,9 @@ type LocalPlace struct {
 	Repo, Branch, Capture string
 }
 
-// localTitleRoom is the cells of title a local header keeps when it picks how much of the place to show, so a short
-// title stays whole and a long one does not crowd the place out.
-const localTitleRoom = 16
+// headerTitleRoom is the cells of title a header keeps before it drops the round, the author or part of a local place,
+// so a short title stays whole and a long one does not crowd them out.
+const headerTitleRoom = 16
 
 // localSpans is the place a local header names at a tier: 0 is the repository, branch and capture, 1 drops the
 // capture, and 2 is the branch alone. Each joint is a span in the overlay.
@@ -892,9 +894,10 @@ func (s Style) badge() string {
 	return st.Render(" " + lens + "loupe ")
 }
 
-// ReviewHeader is the one-row header: the badge, the linked pull request, the round and its title at the left, and
-// the state tag, the progress and the bold exact count at the right, on the surface band. The title gives way first,
-// then the bar, then the round, and then the reference shortens in its middle. The tag and the count never give way.
+// ReviewHeader is the one-row header: the badge, the linked pull request, its author, the round and its title at the
+// left, and the state tag, the progress and the bold exact count at the right, on the surface band. The round gives
+// way first, then the author, both before the title would keep fewer than headerTitleRoom cells, then the title, then
+// the bar, and then the reference shortens in its middle. The tag and the count never give way.
 func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 	badge := s.badge()
 	round := fmt.Sprintf("round %d", h.Round)
@@ -912,6 +915,10 @@ func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 		if width >= 80 && h.Total > 0 {
 			bar = s.Progress(h.Progress, h.Current)
 		}
+	}
+	author := ""
+	if h.Author != "" && h.Local == nil {
+		author = "by @" + h.Author
 	}
 	if width < 80 {
 		title = ""
@@ -946,15 +953,22 @@ func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 		}
 	}
 	mode := ""
-	used := func() int { return Width(badge) + gap(ref) + gap(mode) + gap(round) + right() }
+	used := func() int { return Width(badge) + gap(ref) + gap(author) + gap(mode) + gap(round) + right() }
+	titleRoom := 0
+	if title != "" {
+		// The draw below drops a title given fewer than eight cells, so at least that much is kept.
+		titleRoom = 2 + max(8, min(Width(title), headerTitleRoom))
+	}
+	// The round is bookkeeping, while the author bears on how the human judges each finding, so the round goes first.
+	if used()+titleRoom > avail {
+		round = ""
+	}
+	if used()+titleRoom > avail {
+		author = ""
+	}
 	if h.Local != nil {
 		// The richest tier that leaves the title its room wins. The badge shortens with the place, and the bar gives
 		// way with the repository.
-		titleRoom := 0
-		if title != "" {
-			// The draw below drops a title given fewer than eight cells, so at least that much is kept.
-			titleRoom = 2 + max(8, min(Width(title), localTitleRoom))
-		}
 		for tier := range 3 {
 			setPlace(tier)
 			if len(h.Badges) > 0 {
@@ -983,9 +997,6 @@ func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 	if used() > avail {
 		bar = ""
 	}
-	if used() > avail {
-		round = ""
-	}
 	if over := used() - avail; over > 0 {
 		ref = midTrunc(ref, max(1, Width(ref)-over), s.Glyphs.Ellipsis)
 		place = []Span{{Text: ref, Style: s.Text()}}
@@ -999,6 +1010,9 @@ func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 	if ref != "" && h.Local == nil {
 		out.WriteString(band(Span{Text: "  "}))
 		out.WriteString(s.Link(h.URL, band(Span{Text: ref, Style: refStyle})))
+	}
+	if author != "" {
+		out.WriteString(band(Span{Text: "  by ", Style: s.Overlay()}, Span{Text: "@" + h.Author, Style: text}))
 	}
 	if mode != "" {
 		out.WriteString(band(Span{Text: "  "}) + s.OnSurface(SurfaceHeader, mode))

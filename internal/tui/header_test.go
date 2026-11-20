@@ -163,3 +163,24 @@ func TestHeaderGapGivesWayAtShortHeights(t *testing.T) {
 		}
 	}
 }
+
+// A pull request run's header names the author it captured, sanitized like the title; a local run's never does, and a
+// run captured with no author shows none.
+func TestHeaderNamesThePullRequestAuthor(t *testing.T) {
+	m := modelOf(t, readyFixture(t, "sam-reviewer", "alex-dev"), utf8Env, 124, 30)
+	if header := ansi.Strip(m.reviewHeader()); !strings.Contains(header, "acme/widgets#42  by @alex-dev  round 1") {
+		t.Errorf("header %q lacks the author after the reference", header)
+	}
+	m.target.Author = "evil\x1b]0;x\x07"
+	if header := m.reviewHeader(); strings.Contains(header, "\x1b]0;") || strings.Contains(header, "\x07") {
+		t.Errorf("the author's control characters reached the terminal: %q", header)
+	}
+	if header := ansi.Strip(modelOf(t, newFixture(t), utf8Env, 124, 30).reviewHeader()); strings.Contains(header, " by ") {
+		t.Errorf("a run with no author names one: %q", header)
+	}
+	local := modelOf(t, applyFixture(t, "Claude", applyInputs...), utf8Env, 124, 30)
+	local.target.Author = "alex-dev"
+	if header := ansi.Strip(local.reviewHeader()); strings.Contains(header, "alex-dev") {
+		t.Errorf("a local run's header names an author: %q", header)
+	}
+}

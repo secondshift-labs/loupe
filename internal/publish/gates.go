@@ -322,35 +322,33 @@ func StartAction(verdict, viewer, author string, d *draft.Draft) (action, why st
 	if !slices.Contains(Actions, verdict) {
 		return "comment", ""
 	}
-	action = verdict
+	// Owning the pull request outranks the decisions: no decision makes the verdict available again.
+	if refused := Unavailable(verdict, viewer, author, d); refused == ownPullRequest {
+		return "comment", refused
+	}
 	switch blocking := blockingIDs(d); {
 	case verdict == "approve" && len(blocking) > 0:
-		action, why = "request-changes", blockingPhrase(blocking)
+		return "request-changes", blockingPhrase(blocking)
 	case verdict == "request-changes" && len(blocking) == 0:
-		action, why = "comment", "no published finding is blocking"
+		return "comment", "no published finding is blocking"
 	}
-	if refused := Unavailable(action, viewer, author, d); refused != "" {
-		action, why = "comment", refused
-	}
-	return action, why
+	return verdict, ""
 }
 
+const ownPullRequest = "your own pull request"
+
 // Unavailable says in a few words why the publish step refuses action, or "" when it does not. ActionRefusal holds
-// the whole refusal and its fix, which the step shows when the human picks the action anyway.
+// the whole refusal and its fix, which the step shows when the human picks the action anyway. It refuses only an
+// own pull request and an approve over blocking findings.
 func Unavailable(action, viewer, author string, d *draft.Draft) string {
-	err := ActionRefusal(action, viewer, author, d)
-	r, ok := refusal.As(err)
+	r, ok := refusal.As(ActionRefusal(action, viewer, author, d))
 	switch {
-	case err == nil:
-		return ""
 	case !ok:
-		return err.Error()
+		return ""
 	case r.Code == refusal.OwnPR:
-		return "your own pull request"
-	case r.Code == refusal.Blocking:
-		return blockingPhrase(blockingIDs(d))
+		return ownPullRequest
 	}
-	return r.Message
+	return blockingPhrase(blockingIDs(d))
 }
 
 // blockingPhrase names at most three ids, so a step row stays one line however many findings block.

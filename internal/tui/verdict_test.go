@@ -82,6 +82,7 @@ func TestActionStepOverridesTheVerdictOnItsRow(t *testing.T) {
 	}{
 		{"approve with a blocking finding", "reviewer", "approve", "request-changes", "approve recommended %s f-001 is blocking", nil},
 		{"request-changes with nothing blocking", "reviewer", "request-changes", "comment", "request-changes recommended %s no published finding is blocking", excludeBlocking},
+		{"request-changes on the human's own pull request", "author", "request-changes", "comment", "request-changes recommended %s your own pull request", excludeBlocking},
 		{"approve on the human's own pull request", "author", "approve", "comment", "approve recommended %s your own pull request", excludeBlocking},
 		{"approve with a blocking finding on the human's own pull request", "author", "approve", "comment", "approve recommended %s your own pull request", nil},
 	} {

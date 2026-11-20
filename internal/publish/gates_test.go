@@ -278,6 +278,8 @@ func TestStartAction(t *testing.T) {
 			"your own pull request"},
 		{"own pull request, request-changes", "request-changes", author, verdictDraft("accepted", ""), "comment",
 			"your own pull request"},
+		{"own pull request, request-changes, nothing blocking", "request-changes", author, verdictDraft("", ""), "comment",
+			"your own pull request"},
 		{"own pull request, comment", "comment", author, verdictDraft("accepted", ""), "comment", ""},
 	}
 	for _, tc := range cases {

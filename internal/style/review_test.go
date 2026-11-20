@@ -915,3 +915,70 @@ func TestReviewHeaderFillsEveryWidth(t *testing.T) {
 		}
 	}
 }
+
+// The pull request's author follows its reference. The round gives way before it, and both before the title would
+// keep fewer than 16 cells (docs/tui-design.md, The header).
+func TestReviewHeaderNamesTheAuthor(t *testing.T) {
+	s := reviewStyle(t, false, nil)
+	authored := heading()
+	authored.Author = "alex-dev"
+	for _, c := range []struct {
+		width     int
+		want, not []string
+	}{
+		{124, []string{"acme/widgets#42  by @alex-dev  round 1  feat(cache): add a read-through"}, nil},
+		{100, []string{"acme/widgets#42  by @alex-dev  round 1  feat(cache): add a re"}, nil},
+		{80, []string{"acme/widgets#42  by @alex-dev  feat(cache): ad"}, []string{"r1"}},
+		{60, []string{"acme/widgets#42  by @alex-dev  r1  "}, []string{"feat"}},
+		{56, []string{"acme/widgets#42  by @alex-dev  "}, []string{"r1"}},
+		{40, nil, []string{"r1", "alex-dev"}},
+	} {
+		got := s.ReviewHeader(authored, c.width)
+		if Width(got) != c.width {
+			t.Errorf("%d: header is %d cells: %q", c.width, Width(got), got)
+		}
+		for _, w := range append(c.want, "3/6 decided") {
+			if !strings.Contains(got, w) {
+				t.Errorf("%d: header lacks %q: %q", c.width, w, got)
+			}
+		}
+		for _, w := range c.not {
+			if strings.Contains(got, w) {
+				t.Errorf("%d: header has %q: %q", c.width, w, got)
+			}
+		}
+	}
+
+	short := authored
+	short.Title = "fix typo"
+	if got := s.ReviewHeader(short, 80); !strings.Contains(got, "by @alex-dev  r1  fix typo ") {
+		t.Errorf("a short title does not keep the author at 80: %q", got)
+	}
+
+	bot := authored
+	bot.Author = "dependabot[bot]"
+	if got := s.ReviewHeader(bot, 124); !strings.Contains(got, "  by @dependabot[bot]  ") {
+		t.Errorf("a bot login is not shown as GitHub gives it: %q", got)
+	}
+
+	if got := s.ReviewHeader(heading(), 124); strings.Contains(got, " by ") || strings.Contains(got, "@") {
+		t.Errorf("a header with no author names one: %q", got)
+	}
+
+	tagged := authored
+	tagged.Tag = "PR merged"
+	for w := 1; w <= 124; w++ {
+		got := s.ReviewHeader(tagged, w)
+		if Width(got) != w {
+			t.Fatalf("%d: tagged header is %d cells", w, Width(got))
+		}
+		if w >= 40 && (!strings.Contains(got, "PR merged") || !strings.Contains(got, "3/6 decided")) {
+			t.Errorf("%d: the author pushed out the tag or the count: %q", w, got)
+		}
+	}
+
+	colored := reviewStyle(t, true, nil).ReviewHeader(authored, 124)
+	if Width(colored) != 124 || !strings.Contains(ansi.Strip(colored), "by @alex-dev") {
+		t.Errorf("colored header %q", colored)
+	}
+}

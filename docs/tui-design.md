@@ -64,10 +64,12 @@ The header is one row, then one blank row, then the body.
 
 | Run | Anatomy |
 | :--- | :--- |
-| Pull request | `badge  owner/repo#N  rN  title  [tag]  progress  N/M decided` |
+| Pull request | `badge  owner/repo#N  by @login  rN  title  [tag]  progress  N/M decided` |
 | Local | `badge  [local · returns to X]  <repo> @ <branch> · <capture>  title  progress  N/M decided` |
 
 - A pull request's reference is bold and underlined, and links to the pull request.
+- `by @login` names the pull request's author as capture recorded it, with `by` in the overlay color. A bot keeps the login GitHub gives it, such as `dependabot[bot]`, and the viewer's own pull request names the viewer. A run captured with no author shows none, and so does the standalone confirmation. A local run MUST NOT show one.
+- The round gives way first, then the author, before the title would keep fewer than 16 cells, or fewer than its own width when it is shorter. The round is bookkeeping, and the author changes how the human judges each finding. With a reference like `acme/widgets#42`, 124 and 100 columns show both beside a long title, and 80 columns shows the author but not the round. Below 80 columns the title and the bar are gone, and the round and then the author give way only to keep the tag and the count. The title then gives way, then the bar, and then the reference shortens in its middle.
 - `[tag]` is the pull request's live state when it needs the human's eye (`PR merged`, `PR closed`, `head moved`, `state unknown`), bold in the warn color (spec 050). Like the count, it MUST NOT give way. A local run never shows one.
 - A local run MUST NOT show its reference (`owner/repo:local#N`) in the header. Nothing in it is a link. `loupe list` and `loupe show` still name the run by its reference.
 - `<repo>` is the repository name from the run's prefix, or the base name of its root when there is no prefix.

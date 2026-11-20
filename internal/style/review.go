@@ -997,12 +997,6 @@ func (s Style) ReviewHeader(h ReviewHeading, width int) string {
 	if used() > avail {
 		bar = ""
 	}
-	if used() > avail {
-		round = ""
-	}
-	if used() > avail {
-		author = ""
-	}
 	if over := used() - avail; over > 0 {
 		ref = midTrunc(ref, max(1, Width(ref)-over), s.Glyphs.Ellipsis)
 		place = []Span{{Text: ref, Style: s.Text()}}

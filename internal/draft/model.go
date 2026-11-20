@@ -52,7 +52,7 @@ type Draft struct {
 	// Version starts at 0 on capture; every mutation increments by one.
 	Version int    `json:"version"`
 	Summary string `json:"summary"`
-	// Verdict is the action the agent would publish with. Only the publish step reads it, to choose where it starts.
+	// Verdict is the action the agent would publish with. It sets where the publish step starts, never the action sent.
 	Verdict string `json:"verdict,omitempty"`
 	// Findings is append-only so ids are never reused.
 	Findings []Finding `json:"findings"`

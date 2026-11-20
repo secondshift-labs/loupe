@@ -183,7 +183,7 @@ func seed(home string, gh *fakegh.Server, now time.Time, writeRuns bool, prState
 		verdict string
 	}{
 		{42, midReview(parsed, now), headSHA, ""},
-		// #43 accepts the blocking finding, so the publish step overrides approve; #44 starts on its verdict.
+		// #43 accepts the blocking finding, so the publish step overrides approve. #44 starts on its verdict.
 		{43, readyToPublish(now), headSHA, "approve"},
 		{44, readyToPublish(now), movedSHA, "request-changes"},
 	}

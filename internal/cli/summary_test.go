@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/secondshift-labs/loupe/internal/draft"
@@ -132,4 +134,14 @@ func TestSummaryStoresAndClearsTheVerdict(t *testing.T) {
 			t.Fatalf("%v: verdict %q, want %q", c.args, got, c.want)
 		}
 	}
+}
+
+// The input's verdict is checked against the run's kind, so a target that no longer reads refuses before any write.
+func TestSummaryInputVerdictRefusesAnUnreadableTarget(t *testing.T) {
+	home, dir := sendBackRun(t)
+	if err := os.WriteFile(filepath.Join(dir, "target.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, s := runWithStdin(t, home, `{"summary": "x", "verdict": "approve"}`, "summary", "--run", "o/r#1", "--from", "-", "--expect-findings", "2", "--json")
+	wantCode(t, code, s, refusal.Record)
 }

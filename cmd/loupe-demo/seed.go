@@ -177,16 +177,18 @@ func seed(home string, gh *fakegh.Server, now time.Time, writeRuns bool, prState
 	}
 	gh.SetViewer(viewer)
 	runs := []struct {
-		number int
-		decide func(d *draft.Draft) error
-		live   string
+		number  int
+		decide  func(d *draft.Draft) error
+		live    string
+		verdict string
 	}{
-		{42, midReview(parsed, now), headSHA},
-		{43, readyToPublish(now), headSHA},
-		{44, readyToPublish(now), movedSHA},
+		{42, midReview(parsed, now), headSHA, ""},
+		// #43 accepts the blocking finding, so the publish step overrides approve; #44 starts on its verdict.
+		{43, readyToPublish(now), headSHA, "approve"},
+		{44, readyToPublish(now), movedSHA, "request-changes"},
 	}
 	for _, r := range runs {
-		target, d, err := demoRun(parsed, r.number, r.decide, now)
+		target, d, err := demoRun(parsed, r.number, r.verdict, r.decide, now)
 		if err != nil {
 			return err
 		}
@@ -227,12 +229,12 @@ func seed(home string, gh *fakegh.Server, now time.Time, writeRuns bool, prState
 }
 
 // demoRun is one seeded run's target and draft, decided by decide.
-func demoRun(parsed *diff.Diff, number int, decide func(d *draft.Draft) error, now time.Time) (run.Target, *draft.Draft, error) {
+func demoRun(parsed *diff.Diff, number int, verdict string, decide func(d *draft.Draft) error, now time.Time) (run.Target, *draft.Draft, error) {
 	d := draft.NewEmpty()
 	if _, err := draft.Add(d, findings, parsed, draft.Rules{}, draft.ByAgent, now); err != nil {
 		return run.Target{}, nil, fmt.Errorf("add the demo findings: %w", err)
 	}
-	d.Summary = summary
+	d.Summary, d.Verdict = summary, verdict
 	if err := decide(d); err != nil {
 		return run.Target{}, nil, fmt.Errorf("decide the demo findings for #%d: %w", number, err)
 	}

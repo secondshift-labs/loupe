@@ -56,24 +56,19 @@
 flowchart TD
     A[Action step opens] --> B{Draft has a verdict?}
     B -- no --> C[Start on today's pick: comment<br/>no mark]
-    B -- yes --> D{verdict}
+    B -- yes --> O{ActionRefusal refuses the verdict<br/>as the viewer's own pull request?}
+    O -- yes --> P[Start on comment<br/>reason: your own pull request]
+    O -- no --> D{verdict}
     D -- approve --> E{A publishable finding is blocking?}
-    E -- yes --> F[Candidate: request-changes<br/>reason names the blocking ids]
-    E -- no --> G[Candidate: approve]
+    E -- yes --> F[Start on request-changes<br/>reason names the blocking ids]
+    E -- no --> G[Start on approve]
     D -- request-changes --> H{A publishable finding is blocking?}
-    H -- no --> I[Candidate: comment<br/>reason: no published finding is blocking]
-    H -- yes --> J[Candidate: request-changes]
-    D -- comment --> K[Candidate: comment]
-    F --> L{ActionRefusal refuses the candidate?}
-    G --> L
-    I --> L
-    J --> L
-    K --> L
-    L -- no --> M[Start on the candidate]
-    L -- yes --> N[Start on comment<br/>reason names the refusal]
+    H -- no --> I[Start on comment<br/>reason: no published finding is blocking]
+    H -- yes --> J[Start on request-changes]
+    D -- comment --> K[Start on comment]
 ```
 
-`comment` is never refused, so the last step always lands on an available action. The availability check is the same `ActionRefusal` call that marks a row `unavailable` today.
+The own pull request comes first, because no decision can make the verdict available there. After that check, `ActionRefusal` refuses no start. It refuses `request-changes` only on an own pull request, `approve` only over blocking findings, which the flow has already turned away, and never `comment`. `TestStartActionIsAlwaysAvailable` checks that property over every verdict, decision and viewer. The availability check is the same `ActionRefusal` call that marks a row `unavailable` (amended after the PR review on #161, 2026-11-20).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -174,9 +169,9 @@ The `human-review` skill tells the agent to pass its verdict when it sets the su
 - **FR-003**: On a local run, `--verdict` MUST refuse `wrong-mode`, and a `"verdict"` input key MUST refuse `input` with the fix to drop it, matching the run-kind table in `contracts/cli.md`.
 - **FR-004**: `summary` MUST store the verdict on the draft in the same mutation as the summary, under the same lock, `--expect-version` and `--expect-findings` checks. An agent's `summary` call without a verdict MUST clear a stored verdict. A `--by human` call MUST keep it.
 - **FR-005**: The draft MUST gain an optional `verdict` field, and the draft `schema` MUST go from 7 to 8 under `docs/versioning.md`. The schema test MUST pin the schema 8 field set. The verdict MUST NOT enter the digest.
-- **FR-006**: When the action step opens on a draft with a verdict, the start MUST follow the flow in "How the start is chosen". With verdict `approve` and a blocking finding in the publishable set, the candidate MUST be `request-changes`. With verdict `request-changes` and no blocking finding in the publishable set, the candidate MUST be `comment`. Otherwise the candidate MUST be the verdict.
+- **FR-006**: When the action step opens on a draft with a verdict that FR-008 does not turn away, the start MUST follow the flow in "How the start is chosen". With verdict `approve` and a blocking finding in the publishable set, the candidate MUST be `request-changes`. With verdict `request-changes` and no blocking finding in the publishable set, the candidate MUST be `comment`. Otherwise the candidate MUST be the verdict.
 - **FR-007**: The set of blocking findings MUST be the one `publish.ActionRefusal` reads. The implementation MUST share that logic with `ActionRefusal`, not restate it.
-- **FR-008**: When `publish.ActionRefusal` refuses the candidate, the start MUST be `comment`.
+- **FR-008**: When `publish.ActionRefusal` refuses the verdict because the viewer authored the pull request, the start MUST be `comment` with the reason `your own pull request`, before FR-006 weighs the decisions. The start MUST always be an action that `ActionRefusal` accepts.
 - **FR-009**: The row of the verdict's action MUST open its description with `recommended` and the separator glyph, whether the step starts there or not and whether the action is available or not. `recommended` MUST be in the good tone and read under `NO_COLOR` as a plain word.
 - **FR-010**: When the start differs from the verdict, the verdict's row MUST say why after `recommended ·`, in the warn tone, in place of the action's description. No other line MAY repeat it. The reason MUST be one of these:
   - `<ids> is blocking` or `<ids> are blocking`, for an approve that the decisions turned into request-changes. `<ids>` are the blocking ids in the publishable set, joined by `, `. More than three name the first two and end `and <n> more are blocking`.

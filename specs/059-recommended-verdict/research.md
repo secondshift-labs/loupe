@@ -50,7 +50,7 @@ Spec 059 left no open marker. Each decision below settles how a requirement maps
 
 ## D9. Clearing and `--by human`
 
-- **Decision**: `SetSummary` always assigns the verdict, so an empty one clears it (FR-004). `runSummary` refuses `usage` for a verdict with `--by human` before it resolves the run, fix `drop --verdict; the human picks the action in loupe review`. The same refusal applies to the JSON key.
+- **Decision**: an agent's `SetSummary` call always assigns the verdict, so an empty one clears it. A `--by human` call leaves it as it is (FR-004, amended after the PR review on #161). `runSummary` refuses `usage` for a verdict with `--by human` before it resolves the run, fix `drop --verdict; the human picks the action in loupe review`. The same refusal applies to the JSON key.
 - **Rationale**: both are usage errors that need no run state, and Principle V asks that `--help` and usage refusals work without one.
 
 ## D10. The step after the owner saw it (supersedes D5 and D6)

@@ -47,8 +47,8 @@
 - [x] T020 [P] In `specs/001-loupe-v1/contracts/cli.md`, apply `specs/059-recommended-verdict/contracts/cli-059.md`: the run-kind table row, the `loupe summary` heading, input, paragraph and refusals, and the `loupe show` result line. Each change cites `specs/059-recommended-verdict`.
 - [x] T021 [P] In `specs/038-review-visual-design/contracts/layout.md`, add the paragraph from `specs/059-recommended-verdict/contracts/layout-059.md` after the paragraph that begins "The Action and Inline comments steps MUST be a popup".
 - [x] T022 [P] In `docs/versioning.md`, append to the draft row of the Current versions table: "8 added `verdict`, the agent's recommended action, which only the publish step reads (`specs/059-recommended-verdict`)", and change its version cell to `schema` 8. Commit T018 to T022 as `docs: record the recommended verdict`.
-- [ ] T023 Run `cleanup-comments` over the branch diff. Then run `mise run check` and the patch coverage check from `CONTRIBUTING.md`, and show the output.
-- [ ] T024 By eye: follow the tmux steps in `specs/059-recommended-verdict/quickstart.md` on demo runs #43 and #42, in color, with `NO_COLOR=1`, and at 80×24. Capture the action step for the owner, who MAY ask for a styling round on the mark and the reason row.
+- [x] T023 Run `cleanup-comments` over the branch diff. Then run `mise run check` and the patch coverage check from `CONTRIBUTING.md`, and show the output.
+- [x] T024 By eye: follow the tmux steps in `specs/059-recommended-verdict/quickstart.md` on demo runs #43 and #42, in color, with `NO_COLOR=1`, and at 80×24. Capture the action step for the owner, who MAY ask for a styling round on the mark and the reason row.
 
 ## Dependencies
 

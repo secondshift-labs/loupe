@@ -159,10 +159,12 @@ type Model struct {
 	file       viewport.Model
 
 	// pick is the cursor in the action and inline pickers.
-	pick    int
-	action  string
-	confirm confirmation
-	session *publishSession
+	pick   int
+	action string
+	// startWhy says why the action step did not start on the agent's verdict. p sets it, and the step draws it.
+	startWhy string
+	confirm  confirmation
+	session  *publishSession
 	// sending is true from y until the outcome arrives; no key, not even ctrl+c, is acted on meanwhile.
 	sending bool
 	// message is the review's opening as the human last left it, kept for the life of this program so a cancel or

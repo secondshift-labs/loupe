@@ -418,7 +418,7 @@ func alsoRefused(rest []EntryFailure) string {
 
 // SetSummary compares expectFindings with the included count so an agent cannot summarize a set of findings that
 // did not all land.
-func SetSummary(d *Draft, summary string, expectFindings *int, by string) error {
+func SetSummary(d *Draft, summary, verdict string, expectFindings *int, by string) error {
 	if err := markdown.Check(summary, markdown.Summary, "loupe summary --from -"); err != nil {
 		return err
 	}
@@ -445,6 +445,10 @@ func SetSummary(d *Draft, summary string, expectFindings *int, by string) error 
 		}
 	}
 	d.Summary = summary
+	// The verdict is the agent's view of the round: its call replaces it, and a human rewording the summary keeps it.
+	if by == ByAgent {
+		d.Verdict = verdict
+	}
 	return nil
 }
 

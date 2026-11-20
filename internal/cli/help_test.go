@@ -19,7 +19,7 @@ var contractResultKeys = map[string][]string{
 	"assess":   {"version", "earlier", "open", "addressed", "unassessed", "dropped"},
 	"handoff":  {"host", "paneId", "direction"},
 	"wait":     {"reason", "awaiting", "readiness", "notes", "findings"},
-	"show":     {"summary", "findings", "decisions", "notes", "replies", "target", "dispositions", "readiness", "digest"},
+	"show":     {"summary", "verdict", "findings", "decisions", "notes", "replies", "target", "dispositions", "readiness", "digest"},
 	"feedback": {"readiness", "notes", "findings", "returned", "groups"},
 	"reply":    {"reply", "version"},
 	"list":     {"ref", "kind", "repository", "url", "title", "round", "state", "counts", "capturedAt"},
@@ -36,7 +36,7 @@ var contractResultKeys = map[string][]string{
 var contractInputKeys = map[string][]string{
 	"add":     {`"title"`, `"body"`, `"location"`, `"path"`, `"line"`, `"side"`, `"startLine"`, `"general"`, `"label"`, `"blocking"`, `"confidence"`, `"severity"`, `"verified"`, `"impact"`, `"references"`, `"suggestedFix"`},
 	"edit":    {`"title"`, `"location"`, `null`, `references`},
-	"summary": {`{"summary": `},
+	"summary": {`{"summary": `, `"verdict": `, "--verdict"},
 	"reply":   {`{"body": `},
 	"assess":  {`{"assessments": `, `"ref"`, `"status"`},
 }

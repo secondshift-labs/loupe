@@ -210,9 +210,9 @@ func TestSetSummaryCountMismatch(t *testing.T) {
 	if _, err := Add(d, []FindingInput{located("First", 3), general("Second")}, multiHunk(t), Rules{}, "", addNow); err != nil {
 		t.Fatal(err)
 	}
-	d.Summary = "before"
+	d.Summary, d.Verdict = "before", "approve"
 	three := 3
-	r := refusaltest.Want(t, SetSummary(d, "after", &three, ByAgent), refusal.Count)
+	r := refusaltest.Want(t, SetSummary(d, "after", "comment", &three, ByAgent), refusal.Count)
 	if r.Message != "2 findings are included, expected 3" {
 		t.Fatalf("message %q", r.Message)
 	}
@@ -220,8 +220,8 @@ func TestSetSummaryCountMismatch(t *testing.T) {
 	if !reflect.DeepEqual(r.Details["included"], want) {
 		t.Fatalf("included %v", r.Details["included"])
 	}
-	if d.Summary != "before" {
-		t.Fatalf("summary changed to %q", d.Summary)
+	if d.Summary != "before" || d.Verdict != "approve" {
+		t.Fatalf("summary changed to %q, verdict to %q", d.Summary, d.Verdict)
 	}
 }
 
@@ -231,20 +231,31 @@ func TestSetSummaryStores(t *testing.T) {
 		t.Fatal(err)
 	}
 	two := 2
-	if err := SetSummary(d, "Two findings.", &two, ByAgent); err != nil {
+	if err := SetSummary(d, "Two findings.", "", &two, ByAgent); err != nil {
 		t.Fatal(err)
 	}
 	if d.Summary != "Two findings." {
 		t.Fatalf("summary %q", d.Summary)
 	}
-	if err := SetSummary(d, "No count.", nil, ByHuman); err != nil || d.Summary != "No count." {
+	if err := SetSummary(d, "No count.", "", nil, ByHuman); err != nil || d.Summary != "No count." {
 		t.Fatalf("summary %q err %v", d.Summary, err)
+	}
+}
+
+// A summary call states the agent's whole view of the round, so one without a verdict clears the stored one.
+func TestSetSummaryStoresAndClearsTheVerdict(t *testing.T) {
+	d := NewEmpty()
+	if err := SetSummary(d, "Ready.", "approve", nil, ByAgent); err != nil || d.Verdict != "approve" {
+		t.Fatalf("verdict %q err %v", d.Verdict, err)
+	}
+	if err := SetSummary(d, "Reworded.", "", nil, ByAgent); err != nil || d.Verdict != "" || d.Summary != "Reworded." {
+		t.Fatalf("summary %q verdict %q err %v", d.Summary, d.Verdict, err)
 	}
 }
 
 func TestSetSummaryRefusesMarkdown(t *testing.T) {
 	d := NewEmpty()
-	r := refusaltest.Want(t, SetSummary(d, "<!-- hidden -->", nil, ByHuman), refusal.Markdown)
+	r := refusaltest.Want(t, SetSummary(d, "<!-- hidden -->", "", nil, ByHuman), refusal.Markdown)
 	if r.Fix != "loupe summary --from -" || d.Summary != "" {
 		t.Fatalf("fix %q summary %q", r.Fix, d.Summary)
 	}
@@ -589,5 +600,16 @@ func TestAddWithDefaultRulesRefusesOptions(t *testing.T) {
 	r := refusaltest.Want(t, err, refusal.Input)
 	if !strings.Contains(r.Message, "options apply only to local runs") || r.Fix != `use "suggestedFix" instead` {
 		t.Fatalf("message %q fix %q", r.Message, r.Fix)
+	}
+}
+
+// The verdict is the agent's, so a human rewording the summary keeps it.
+func TestSetSummaryByHumanKeepsTheVerdict(t *testing.T) {
+	d := NewEmpty()
+	if err := SetSummary(d, "Ready.", "approve", nil, ByAgent); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetSummary(d, "Reworded by hand.", "", nil, ByHuman); err != nil || d.Verdict != "approve" || d.Summary != "Reworded by hand." {
+		t.Fatalf("summary %q verdict %q err %v", d.Summary, d.Verdict, err)
 	}
 }

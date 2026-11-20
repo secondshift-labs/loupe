@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/secondshift-labs/loupe/internal/draft"
 	"github.com/secondshift-labs/loupe/internal/publish"
@@ -106,9 +107,9 @@ func (m *Model) updateInline(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 var actionDescriptions = map[string]string{
-	"comment":         "post the findings without a verdict",
-	"approve":         "post the findings and approve the pull request",
-	"request-changes": "post the findings and request changes",
+	"comment":         "post findings, no verdict",
+	"approve":         "post findings and approve",
+	"request-changes": "post findings and request changes",
 }
 
 func (m *Model) actionView() string {
@@ -116,11 +117,18 @@ func (m *Model) actionView() string {
 	var picked [2]int
 	for i, action := range publish.Actions {
 		start := len(rows)
-		if r, ok := refusal.As(m.actionRefusal(action)); ok {
-			rows = append(rows, m.pickerRow(false, true, action, "unavailable: "+r.Message, m.popupInner())...)
-		} else {
-			rows = append(rows, m.pickerRow(i == m.pick, false, action, actionDescriptions[action], m.popupInner())...)
+		unavailable := publish.Unavailable(action, m.target.Viewer, m.target.Author, m.draft)
+		text := pickerText{text: actionDescriptions[action]}
+		switch {
+		case action == m.draft.Verdict && m.startWhy != "":
+			// The agent's row says why the cursor is elsewhere, so the step needs no line of its own for it.
+			text = pickerText{lead: "recommended", leadKind: style.Good, text: m.startWhy, textKind: style.Warn}
+		case action == m.draft.Verdict:
+			text.lead, text.leadKind = "recommended", style.Good
+		case unavailable != "":
+			text = pickerText{lead: "unavailable", text: unavailable}
 		}
+		rows = append(rows, m.pickerRow(i == m.pick && unavailable == "", unavailable != "", action, text, m.popupInner())...)
 		if i == m.pick {
 			picked = [2]int{start, len(rows)}
 		}
@@ -139,7 +147,7 @@ func (m *Model) inlineView() string {
 	var picked [2]int
 	for i, mode := range publish.InlineModes {
 		start := len(rows)
-		rows = append(rows, m.pickerRow(i == m.pick, false, mode, inlineDescriptions[mode], m.popupInner())...)
+		rows = append(rows, m.pickerRow(i == m.pick, false, mode, pickerText{text: inlineDescriptions[mode]}, m.popupInner())...)
 		if i == m.pick {
 			picked = [2]int{start, len(rows)}
 		}
@@ -217,9 +225,17 @@ func (m *Model) publishStepHints(enter string) []style.Hint {
 // pickerIndent is where a choice's description starts, and where its wrapped lines continue.
 const pickerIndent = 19
 
+// pickerText is a choice's description: an optional lead word in its own tone, the separator, then the text. A Plain
+// kind draws its part in the secondary tone.
+type pickerText struct {
+	lead               string
+	leadKind, textKind style.Kind
+	text               string
+}
+
 // pickerRow is the cursor, the name and the description, wrapped under the description's column so a refusal reason
 // is never clipped.
-func (m *Model) pickerRow(selected, disabled bool, name, description string, inner int) []string {
+func (m *Model) pickerRow(selected, disabled bool, name string, desc pickerText, inner int) []string {
 	cursor := " "
 	nameStyle := m.styles.Text()
 	switch {
@@ -228,10 +244,27 @@ func (m *Model) pickerRow(selected, disabled bool, name, description string, inn
 	case selected:
 		cursor, nameStyle = m.styles.Emphasis(m.styles.Cursor).Render(m.styles.PickerCursor()), m.styles.Emphasis(m.styles.Accent)
 	}
+	tone := func(k style.Kind) lipgloss.Style {
+		if k == style.Plain {
+			return m.styles.Secondary()
+		}
+		return m.styles.Of(k)
+	}
+	lead := ""
+	if desc.lead != "" {
+		lead = desc.lead + " " + m.glyphs.Sep + " "
+	}
 	indent := strings.Repeat(" ", pickerIndent)
-	lines := strings.Split(m.styles.Wrap(render.ForDisplay(description), inner, indent), "\n")
+	lines := strings.Split(m.styles.Wrap(render.ForDisplay(lead+desc.text), inner, indent), "\n")
 	for i, l := range lines {
-		lines[i] = indent + m.styles.Secondary().Render(strings.TrimPrefix(l, indent))
+		l = strings.TrimPrefix(l, indent)
+		if i == 0 && lead != "" && strings.HasPrefix(l, lead) {
+			l = tone(desc.leadKind).Render(desc.lead) + m.styles.Secondary().Render(" "+m.glyphs.Sep+" ") +
+				tone(desc.textKind).Render(strings.TrimPrefix(l, lead))
+		} else {
+			l = tone(desc.textKind).Render(l)
+		}
+		lines[i] = indent + l
 	}
 	lines[0] = cursor + " " + nameStyle.Render(style.Pad(name, pickerIndent-3)) + " " + strings.TrimPrefix(lines[0], indent)
 	return lines

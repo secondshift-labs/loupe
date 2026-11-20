@@ -18,7 +18,7 @@ When an earlier round was published, capture reads its findings back. It also re
 
 The agent files findings with `loupe add`. Each finding has a title and a Markdown body. It points at a line of the captured diff, or it is general. A location outside the captured diff is refused, and the refusal lists the nearest valid lines. Optional fields carry a label, a severity, whether the finding blocks, and how the agent knows.
 
-The agent then sets a summary with `loupe summary`. The summary is for you. It says what the round looked at and what it could not check. It is not published.
+The agent then sets a summary with `loupe summary`. The summary is for you. It says what the round looked at and what it could not check. It is not published. The agent can also name the action it would publish with, `--verdict`. That only sets where your publish step starts.
 
 ### 3. The agent hands the run to you
 
@@ -82,6 +82,8 @@ When no finding is pending and no note is open, press `p` in `loupe review`, or 
 The cursor starts in the review's opening. Type it in your own words and press Esc to leave it. Then `y` or `p` sends. `n`, `q` or `ctrl+c` cancels, and nothing is sent. Keys that scroll or switch views do nothing else, and any other key only says which keys answer.
 
 Only accepted findings are published. One confirmation sends exactly one GitHub request. `--action` picks `comment`, `approve` or `request-changes`. `--inline` also turns located findings into inline comments.
+
+In `loupe review`, the action step starts on the agent's verdict and marks it `recommended`. Your decisions win over it. An accepted blocking finding starts an `approve` on `request-changes`, a `request-changes` with nothing blocking left starts on `comment`, and an action you cannot take starts on `comment`. The agent's row says why, as `recommended · f-002 is blocking`. Without a verdict the step starts on `comment`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/review-dark.png">

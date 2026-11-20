@@ -23,12 +23,14 @@ type Mode interface {
 	Feedback(d *draft.Draft, dir string) (map[string]any, error)
 }
 
-// InputRules refuse finding fields a run kind does not have. Stored local findings keep side RIGHT and blocking
+// InputRules refuse input fields a run kind does not have. Stored local findings keep side RIGHT and blocking
 // false, and Edit re-validates them, so these checks run only on what the agent sent.
 type InputRules struct {
 	RefuseBlocking     bool
 	RefuseSide         bool
 	RefuseSuggestedFix bool
+	// RefuseVerdict refuses summary's verdict, which only a pull request's publish step reads.
+	RefuseVerdict bool
 }
 
 // Of returns the mode of the run that t describes.

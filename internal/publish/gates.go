@@ -295,18 +295,71 @@ func ActionRefusal(action, viewer, author string, d *draft.Draft) error {
 	if action != "approve" {
 		return nil
 	}
-	var blocking []string
-	for _, f := range draft.PublishableSet(d) {
-		if f.Blocking {
-			blocking = append(blocking, f.ID)
-		}
-	}
+	blocking := blockingIDs(d)
 	if len(blocking) == 0 {
 		return nil
 	}
 	return refusal.New(refusal.Blocking,
 		fmt.Sprintf("cannot approve while publishable findings are blocking: %s", strings.Join(blocking, ", ")),
 		"use --action comment or --action request-changes, or exclude or unblock the finding in loupe review")
+}
+
+// blockingIDs are the publishable findings marked blocking: what refuses approve, and what overrides a verdict.
+func blockingIDs(d *draft.Draft) []string {
+	var ids []string
+	for _, f := range draft.PublishableSet(d) {
+		if f.Blocking {
+			ids = append(ids, f.ID)
+		}
+	}
+	return ids
+}
+
+// StartAction is where the publish step's cursor starts: the agent's verdict, unless the human's decisions contradict
+// it or the action is refused. why says in a few words what moved the start off the verdict, and is empty when
+// nothing did.
+func StartAction(verdict, viewer, author string, d *draft.Draft) (action, why string) {
+	if !slices.Contains(Actions, verdict) {
+		return "comment", ""
+	}
+	// Owning the pull request outranks the decisions: no decision makes the verdict available again.
+	if refused := Unavailable(verdict, viewer, author, d); refused == ownPullRequest {
+		return "comment", refused
+	}
+	switch blocking := blockingIDs(d); {
+	case verdict == "approve" && len(blocking) > 0:
+		return "request-changes", blockingPhrase(blocking)
+	case verdict == "request-changes" && len(blocking) == 0:
+		return "comment", "no published finding is blocking"
+	}
+	return verdict, ""
+}
+
+const ownPullRequest = "your own pull request"
+
+// Unavailable says in a few words why the publish step refuses action, or "" when it does not. ActionRefusal holds
+// the whole refusal and its fix, which the step shows when the human picks the action anyway. It refuses only an
+// own pull request and an approve over blocking findings.
+func Unavailable(action, viewer, author string, d *draft.Draft) string {
+	r, ok := refusal.As(ActionRefusal(action, viewer, author, d))
+	switch {
+	case !ok:
+		return ""
+	case r.Code == refusal.OwnPR:
+		return ownPullRequest
+	}
+	return blockingPhrase(blockingIDs(d))
+}
+
+// blockingPhrase names at most three ids, so a step row stays one line however many findings block.
+func blockingPhrase(ids []string) string {
+	if len(ids) == 1 {
+		return ids[0] + " is blocking"
+	}
+	if len(ids) > 3 {
+		return fmt.Sprintf("%s and %d more are blocking", strings.Join(ids[:2], ", "), len(ids)-2)
+	}
+	return strings.Join(ids, ", ") + " are blocking"
 }
 
 func ReadinessRefusal(d *draft.Draft) error { return draft.ReadinessRefusal(d) }

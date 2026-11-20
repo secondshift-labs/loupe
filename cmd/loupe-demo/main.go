@@ -173,7 +173,7 @@ func demoBody(now time.Time) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse the demo diff: %w", err)
 	}
-	target, d, err := demoRun(parsed, 43, readyToPublish(now), now)
+	target, d, err := demoRun(parsed, 43, "", readyToPublish(now), now)
 	if err != nil {
 		return "", err
 	}

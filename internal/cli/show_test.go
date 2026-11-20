@@ -530,3 +530,29 @@ func TestShowTextDrawsOptionsAndThePick(t *testing.T) {
 		}
 	}
 }
+
+func TestShowJSONCarriesTheVerdictOnlyWhenSet(t *testing.T) {
+	home, _ := sendBackRun(t)
+	keyOf := func() (any, bool) {
+		t.Helper()
+		code, s := runWithStdin(t, home, "", "show", "--run", "o/r#1", "--json")
+		if code != 0 {
+			t.Fatalf("exit %d stderr %q", code, s.stderr.String())
+		}
+		v, ok := decodeOne(t, s.stdout.Bytes())["verdict"]
+		return v, ok
+	}
+	if v, ok := keyOf(); ok {
+		t.Fatalf("verdict %v on a draft without one", v)
+	}
+	if code, s := runWithStdin(t, home, "", "summary", "--run", "o/r#1", "--body", "x", "--verdict", "approve", "--expect-findings", "2"); code != 0 {
+		t.Fatalf("exit %d stderr %q", code, s.stderr.String())
+	}
+	if v, ok := keyOf(); !ok || v != "approve" {
+		t.Fatalf("verdict %v present %v", v, ok)
+	}
+	code, s := runWithStdin(t, home, "", "show", "--run", "o/r#1")
+	if code != 0 || strings.Contains(s.stdout.String(), "approve") {
+		t.Fatalf("exit %d, text show names the verdict:\n%s", code, s.stdout.String())
+	}
+}

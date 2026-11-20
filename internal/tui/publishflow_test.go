@@ -97,8 +97,7 @@ func TestActionPickerDisablesBlockedApprove(t *testing.T) {
 	tm := startPublishApp(t, readyFixture(t, "reviewer", "author"), nil)
 	waitFor(t, tm, "3/3 decided")
 	tm.Type("p")
-	// The popup wraps the reason, so it is looked for in pieces that stay on one row.
-	waitFor(t, tm, "> comment", "  approve", "unavailable: cannot approve while", "f-001")
+	waitFor(t, tm, "> comment", "  approve", "unavailable", "f-001 is blocking")
 	tm.Type("j")
 	tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
 	waitFor(t, tm, "or exclude or unblock", "the finding in loupe review")
@@ -112,8 +111,7 @@ func TestActionPickerOffersOnlyCommentOnOwnPullRequest(t *testing.T) {
 	tm := startPublishApp(t, readyFixture(t, "author", "author"), nil)
 	waitFor(t, tm, "3/3 decided")
 	tm.Type("p")
-	// The popup wraps each reason, so it is looked for in pieces that stay on one row.
-	waitFor(t, tm, "> comment", "unavailable: author is the author", "cannot approve it", "cannot request changes")
+	waitFor(t, tm, "> comment", "unavailable", "your own pull request")
 	quitFromPicker(t, tm)
 }
 

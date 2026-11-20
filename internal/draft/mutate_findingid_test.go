@@ -153,7 +153,7 @@ func TestEditChecksOnlyChangedFieldsForIDs(t *testing.T) {
 func TestSetSummaryRefusesAFindingID(t *testing.T) {
 	d := NewEmpty()
 	d.Summary = "before"
-	r := wantFindingID(t, SetSummary(d, "Two findings.\nf-014 is gone.", nil, ByHuman), "summary", "f-014", 2)
+	r := wantFindingID(t, SetSummary(d, "Two findings.\nf-014 is gone.", "", nil, ByHuman), "summary", "f-014", 2)
 	if !strings.HasSuffix(r.Fix, "run loupe summary --from - again") || d.Summary != "before" {
 		t.Fatalf("fix %q summary %q", r.Fix, d.Summary)
 	}

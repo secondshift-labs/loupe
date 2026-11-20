@@ -295,18 +295,58 @@ func ActionRefusal(action, viewer, author string, d *draft.Draft) error {
 	if action != "approve" {
 		return nil
 	}
-	var blocking []string
-	for _, f := range draft.PublishableSet(d) {
-		if f.Blocking {
-			blocking = append(blocking, f.ID)
-		}
-	}
+	blocking := blockingIDs(d)
 	if len(blocking) == 0 {
 		return nil
 	}
 	return refusal.New(refusal.Blocking,
 		fmt.Sprintf("cannot approve while publishable findings are blocking: %s", strings.Join(blocking, ", ")),
 		"use --action comment or --action request-changes, or exclude or unblock the finding in loupe review")
+}
+
+// blockingIDs are the publishable findings marked blocking: what refuses approve, and what overrides a verdict.
+func blockingIDs(d *draft.Draft) []string {
+	var ids []string
+	for _, f := range draft.PublishableSet(d) {
+		if f.Blocking {
+			ids = append(ids, f.ID)
+		}
+	}
+	return ids
+}
+
+// StartAction is where the publish step's cursor starts: the agent's verdict, unless the human's decisions contradict
+// it or the action is refused. why says what moved the start off the verdict, and is empty when nothing did.
+func StartAction(verdict, viewer, author string, d *draft.Draft) (action, why string) {
+	if !slices.Contains(Actions, verdict) {
+		return "comment", ""
+	}
+	action = verdict
+	blocking := blockingIDs(d)
+	switch {
+	case verdict == "approve" && len(blocking) > 0:
+		verb := "is"
+		if len(blocking) > 1 {
+			verb = "are"
+		}
+		action, why = "request-changes", fmt.Sprintf("%s %s blocking", strings.Join(blocking, ", "), verb)
+	case verdict == "request-changes" && len(blocking) == 0:
+		action, why = "comment", "no published finding is blocking"
+	}
+	if err := ActionRefusal(action, viewer, author, d); err != nil {
+		why = err.Error()
+		if r, ok := refusal.As(err); ok {
+			why = r.Message
+			if r.Code == refusal.OwnPR {
+				why = "you authored this pull request"
+			}
+		}
+		action = "comment"
+	}
+	if why == "" {
+		return action, ""
+	}
+	return action, fmt.Sprintf("agent recommended %s; %s", verdict, why)
 }
 
 func ReadinessRefusal(d *draft.Draft) error { return draft.ReadinessRefusal(d) }

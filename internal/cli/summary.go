@@ -94,7 +94,7 @@ func runSummary(cmd *cobra.Command, deps Deps) error {
 		summary = *in.Summary
 	}
 	d, err := draft.Mutate(dir, "summary", expectVersion, deps.Getenv, func(d *draft.Draft) error {
-		return draft.SetSummary(d, summary, expectFindings, by)
+		return draft.SetSummary(d, summary, "", expectFindings, by)
 	})
 	if err != nil {
 		return err

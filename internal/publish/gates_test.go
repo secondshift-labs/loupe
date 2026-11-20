@@ -223,6 +223,91 @@ func TestActionRefusal(t *testing.T) {
 	}
 }
 
+// verdictDraft holds f-001, accepted and never blocking, and f-002 and f-005 in the given states.
+func verdictDraft(f002, f005 string) *draft.Draft {
+	d := draft.NewEmpty()
+	d.Findings = []draft.Finding{finding("f-001", "issue", false, nil)}
+	accept(d, "f-001")
+	for _, fs := range [][2]string{{"f-002", f002}, {"f-005", f005}} {
+		id, state := fs[0], fs[1]
+		if state == "" {
+			continue
+		}
+		f := finding(id, "issue", state != "unblocked", nil)
+		switch state {
+		case "accepted", "unblocked":
+			accept(d, id)
+		case "excluded":
+			d.Decisions[id] = draft.Decision{FindingID: id, Decision: draft.DecisionExcluded, FindingRev: 1, At: fixtureNow}
+		case "withdrawn":
+			f.Included = false
+		}
+		d.Findings = append(d.Findings, f)
+	}
+	return d
+}
+
+func TestStartAction(t *testing.T) {
+	const reviewer, author = "reviewer", "author"
+	cases := []struct {
+		name, verdict, viewer string
+		d                     *draft.Draft
+		start, why            string
+	}{
+		{"no verdict", "", reviewer, verdictDraft("accepted", ""), "comment", ""},
+		{"unknown verdict", "bogus", reviewer, verdictDraft("", ""), "comment", ""},
+		{"comment", "comment", reviewer, verdictDraft("", ""), "comment", ""},
+		{"comment with a blocking finding", "comment", reviewer, verdictDraft("accepted", ""), "comment", ""},
+		{"approve", "approve", reviewer, verdictDraft("", ""), "approve", ""},
+		{"approve with no findings", "approve", reviewer, draft.NewEmpty(), "approve", ""},
+		{"approve, blocking accepted", "approve", reviewer, verdictDraft("accepted", ""), "request-changes",
+			"agent recommended approve; f-002 is blocking"},
+		{"approve, two blocking accepted", "approve", reviewer, verdictDraft("accepted", "accepted"), "request-changes",
+			"agent recommended approve; f-002, f-005 are blocking"},
+		{"approve, blocking excluded", "approve", reviewer, verdictDraft("excluded", ""), "approve", ""},
+		{"approve, blocking withdrawn", "approve", reviewer, verdictDraft("withdrawn", ""), "approve", ""},
+		{"approve, blocking unblocked", "approve", reviewer, verdictDraft("unblocked", ""), "approve", ""},
+		{"request-changes, blocking accepted", "request-changes", reviewer, verdictDraft("accepted", ""), "request-changes", ""},
+		{"request-changes, blocking excluded", "request-changes", reviewer, verdictDraft("excluded", ""), "comment",
+			"agent recommended request-changes; no published finding is blocking"},
+		{"request-changes, nothing blocking", "request-changes", reviewer, verdictDraft("", ""), "comment",
+			"agent recommended request-changes; no published finding is blocking"},
+		{"own pull request, approve", "approve", author, verdictDraft("", ""), "comment",
+			"agent recommended approve; you authored this pull request"},
+		{"own pull request, approve, blocking accepted", "approve", author, verdictDraft("accepted", ""), "comment",
+			"agent recommended approve; you authored this pull request"},
+		{"own pull request, request-changes", "request-changes", author, verdictDraft("accepted", ""), "comment",
+			"agent recommended request-changes; you authored this pull request"},
+		{"own pull request, comment", "comment", author, verdictDraft("accepted", ""), "comment", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			start, why := StartAction(tc.verdict, tc.viewer, author, tc.d)
+			if start != tc.start || why != tc.why {
+				t.Fatalf("got (%q, %q), want (%q, %q)", start, why, tc.start, tc.why)
+			}
+		})
+	}
+}
+
+// The start is never an action the step would refuse, whatever the verdict and the decisions.
+func TestStartActionIsAlwaysAvailable(t *testing.T) {
+	states := []string{"", "accepted", "excluded", "withdrawn", "unblocked"}
+	for _, verdict := range append([]string{"", "bogus"}, Actions...) {
+		for _, f002 := range states {
+			for _, f005 := range states {
+				for _, viewer := range []string{"reviewer", "author"} {
+					d := verdictDraft(f002, f005)
+					start, _ := StartAction(verdict, viewer, "author", d)
+					if err := ActionRefusal(start, viewer, "author", d); err != nil {
+						t.Fatalf("verdict %q, f-002 %q, f-005 %q, viewer %s: start %q refused: %v", verdict, f002, f005, viewer, start, err)
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestClosedSince(t *testing.T) {
 	cases := []struct {
 		name     string

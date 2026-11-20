@@ -174,6 +174,10 @@ func (m *Model) publishStep(step int, rows []string, picked [2]int, enter, why s
 		for i, l := range reason {
 			reason[i] = m.styles.Secondary().Render(l)
 		}
+		// The reason never pushes the cursor's choice off screen, or enter would pick an action the human cannot see.
+		if keep := maxRows - len(notice) - 1 - (picked[1] - picked[0]); len(reason) > keep {
+			reason = m.shortenNotice(reason, max(1, keep))
+		}
 		notice = append(reason, notice...)
 	}
 	// Blank rows around the steps and above the border give them room. The current step's block marks the focus, so

@@ -16,7 +16,7 @@ Run these from the worktree after `mise run build`. Inside the repository, `loup
 2. Press esc, open `f-002`, exclude it, and press `p` again. The cursor is on `approve`, and no reason row shows.
 3. Press `j`, then enter, then esc. The cursor is back on the action the human chose, not on the start.
 4. `mise run demo -- summary --run 'acme/widgets#42' --body x --verdict approve --by human`. Expect `usage` and the fix `drop --verdict; the human picks the action in loupe review`.
-5. Repeat step 1 with `NO_COLOR=1` and at 80×24. The mark and the reason read without color, and the reason row stays whole.
+5. Repeat step 1 with `NO_COLOR=1` and at 80×24. The mark and the reason read without color, and the reason row stays whole while the cursor's choice still fits.
 
 ## Not covered here
 

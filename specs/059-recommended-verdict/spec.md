@@ -155,7 +155,7 @@ The `human-review` skill tells the agent to pass its verdict when it sets the su
 - The human goes back from the inline step to the action step with esc. The cursor returns to the action the human chose, as today, not to the start rule.
 - The human leaves the action step with esc and opens it again with `p`. The start is worked out again, because decisions can change in between.
 - The viewer and author recorded at capture are out of date. The start uses the recorded pair, as the action step does today, and publish checks them again against GitHub.
-- A long list of blocking ids does not fit the popup width. The reason row wraps as other popup text wraps. It is never cut so that an id is lost.
+- A long list of blocking ids does not fit the popup width. The reason row wraps as other popup text wraps. When the popup cannot hold both the whole reason and the cursor's choice, the reason drops its middle rows and says how many, so enter never picks an action the human cannot see. The first and last ids stay (amended after review, 2026-11-20).
 - The agent sets a verdict, and a later round is captured. The new round has no verdict until the agent sets that round's summary.
 - An older draft at schema 7 has no verdict. It reads as no verdict.
 - An older loupe binary reads a schema 8 draft. It refuses `record` with the fix `upgrade loupe`, as `docs/versioning.md` already requires.

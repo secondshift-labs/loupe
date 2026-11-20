@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -149,5 +150,31 @@ func TestReasonStaysWholeWhenTheStepIsShort(t *testing.T) {
 	}
 	if !cut {
 		t.Fatal("no size cut the choices, so the test never saw the reason under pressure")
+	}
+}
+
+// A reason too long for the popup gives up its middle rows before the cursor's choice leaves the screen, so enter
+// never picks an action the human cannot see.
+func TestLongReasonKeepsTheCursorsChoiceOnScreen(t *testing.T) {
+	m := verdictModel(t, "reviewer", "author", "approve", 24, func(d *draft.Draft) error {
+		for i := 4; i < 64; i++ {
+			id := fmt.Sprintf("f-%03d", i)
+			d.Findings = append(d.Findings, draft.Finding{ID: id, Rev: 1, Title: "T", Body: "B", General: true, Label: "issue",
+				Blocking: true, By: draft.ByAgent, Included: true, History: []draft.HistoryEntry{}})
+			if _, err := draft.Accept(d, id, "", testNow); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	wantStart(t, m, "request-changes")
+	for _, size := range [][2]int{{60, 12}, {80, 16}, {100, 24}} {
+		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		view := m.View().Content
+		text := paneText(view)
+		if !strings.Contains(view, " request-changes ") || !strings.Contains(text, "agent recommended approve; f-001") ||
+			!strings.Contains(view, "are blocking") {
+			t.Fatalf("%dx%d lost the cursor's choice or the reason's ends:\n%s", size[0], size[1], view)
+		}
 	}
 }

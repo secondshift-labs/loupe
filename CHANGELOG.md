@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.0](https://github.com/secondshift-labs/loupe/compare/v0.25.2...v0.26.0) (2026-11-20)
+
+
+### Features
+
+* **tui:** show the pull request author in the review header ([#159](https://github.com/secondshift-labs/loupe/issues/159)) ([3ab7efc](https://github.com/secondshift-labs/loupe/commit/3ab7efcb1e6516950d9b876c1ee0a64f5e762790))
+* **tui:** start the publish step on the agent's recommended verdict ([#161](https://github.com/secondshift-labs/loupe/issues/161)) ([ff485bb](https://github.com/secondshift-labs/loupe/commit/ff485bbd2bdefd29b8787e757bd2efeb534b26a0))
+
 ## [0.25.2](https://github.com/secondshift-labs/loupe/compare/v0.25.1...v0.25.2) (2026-11-17)
 
 

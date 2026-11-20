@@ -13,27 +13,27 @@
 - **Subject**: the action step of the publish modal in `loupe review` starts on a verdict that the agent recorded with `loupe summary`, and marks it `recommended`.
 - **Mechanism**: a new optional `--verdict comment|approve|request-changes` flag and `"verdict"` input field on `loupe summary`, stored on the round's draft (draft schema 8). No new command.
 - **Override**: an accepted blocking finding turns `approve` into `request-changes`, no publishable blocking finding turns `request-changes` into `comment`, and an unavailable action falls back to `comment`. A note in the popup names the reason.
-- **Size**: one draft field, one flag, a start rule in the modal, help, contract, skill and design-doc text. No GitHub request, refusal code or published byte changes.
-- **Open, for the owner**: Q1, whether a run with no verdict derives its start from the decisions. Q2, whether the verdict reaches anything beyond the modal, such as `loupe show --json` or the published review.
+- **Size**: one draft field, one flag, a start rule in the modal, help, contract, skill and design-doc text. One `loupe show --json` field. No GitHub request, refusal code or published byte changes.
+- **Settled by the owner**: with no verdict, the modal keeps today's `comment` start. Beyond the modal, the verdict reaches only `loupe show --json`, so the agent can read back what it set. Nothing is open.
 
 ## Relationship to earlier specifications
 
-- It adds to the `loupe summary` section of `specs/001-loupe-v1/contracts/cli.md`: a `--verdict` flag and a `"verdict"` input field. It adds one row to the table of finding fields by run kind at the top of that file. The summary's `--json` result does not change. No refusal code or exit code is added.
+- It adds to the `loupe summary` section of `specs/001-loupe-v1/contracts/cli.md`: a `--verdict` flag and a `"verdict"` input field. It adds one row to the table of finding fields by run kind at the top of that file. It adds an optional `verdict` field to the `loupe show --json` result. The summary's `--json` result does not change. No refusal code or exit code is added.
 - It adds the `verdict` field to the draft, which bumps the draft `schema` from 7 to 8 under `docs/versioning.md`. The bump only adds a field, so no reader migrates.
 - It amends the publish popup paragraph of `docs/tui-design.md`: the action step gains a `recommended` mark on one row and, when the start differs from the verdict, one reason row.
 - It reuses `publish.ActionRefusal` (`internal/publish/gates.go`) for availability and for the set of blocking findings. It adds no rule about own pull requests or blocking findings.
 - `loupe publish --action` does not change. `--action` stays required, and the verdict never supplies it.
 - `specs/007-unattended-publish` does not change. An unattended publication still sends COMMENT whatever the verdict says.
 - `specs/049-apply-mode` does not change. A local run has no publish action step, so it takes no verdict.
-- `docs/comment-format.md`, the digest and the published review do not change, unless Q2 decides otherwise.
+- `docs/comment-format.md`, the digest, the attempt, the receipt, the `loupe-meta` marker, `loupe stats` and the published review do not change.
 - Constitution 4.0.0 is unchanged. Principle II holds: the verdict only moves the cursor. The human still picks the action with enter and confirms the review with `y` in one interactive command. An agent still cannot publish or set the action.
 
 ## Clarifications
 
-### Open for the owner
+### Settled by the owner, 2026-11-20
 
-- Q1: With no agent verdict, does the modal derive its start from the decisions alone, for example `request-changes` when a publishable finding is blocking? [NEEDS CLARIFICATION: derive a start from the decisions when there is no verdict, or keep today's `comment`?] This spec keeps today's behavior until the owner answers (FR-012). The same answer decides the case where the agent recommended `comment` and the human accepted a blocking finding (Edge Cases).
-- Q2: Does the verdict reach anything beyond the modal's start? [NEEDS CLARIFICATION: does the verdict appear in `loupe show --json`, the attempt and receipt, the `loupe-meta` marker for `loupe stats`, or the published review?] The owner's ask covers only the modal's start. This spec keeps every other output as it is until the owner answers (FR-015).
+- Q1: With no agent verdict, does the modal derive its start from the decisions alone, for example `request-changes` when a publishable finding is blocking? → A: No. The modal keeps today's `comment` start, with no mark and no reason row. A derived start would be loupe's own verdict, and nothing in the modal would say who made it. The same rule covers an agent that recommended `comment` while the human accepted a blocking finding: the start stays on `comment` (FR-012, Edge Cases).
+- Q2: Does the verdict reach anything beyond the modal's start? → A: Only `loupe show --json`, so the agent can read back what it set. It does not reach `loupe show` without `--json`, the `summary` result, the attempt, the receipt, the `loupe-meta` marker, `loupe stats` or the published review (FR-015).
 
 ### Settled in this specification
 
@@ -51,7 +51,7 @@
 ```mermaid
 flowchart TD
     A[Action step opens] --> B{Draft has a verdict?}
-    B -- no --> C[Start on today's pick: comment<br/>no mark, no reason row<br/>pending Q1]
+    B -- no --> C[Start on today's pick: comment<br/>no mark, no reason row]
     B -- yes --> D{verdict}
     D -- approve --> E{A publishable finding is blocking?}
     E -- yes --> F[Candidate: request-changes<br/>reason names the blocking ids]
@@ -143,13 +143,14 @@ The `human-review` skill tells the agent to pass its verdict when it sets the su
 6. **Given** a local run, **When** the agent passes `--verdict`, **Then** loupe refuses `wrong-mode`. **When** the agent passes `"verdict"` in the input, **Then** loupe refuses `input`, fix: drop it.
 7. **Given** `--by human`, **When** a verdict is passed, **Then** loupe refuses `usage`, fix: drop the verdict.
 8. **Given** no run, **When** the agent runs `loupe summary --help`, **Then** the help names `--verdict`, the `"verdict"` input field, the three values, and that the verdict only sets where the publish modal starts.
+9. **Given** a draft with a verdict, **When** the agent runs `loupe show --json`, **Then** the result carries `verdict`. **Given** a draft without one, **Then** the result has no `verdict` key.
 
 ---
 
 ### Edge Cases
 
-- No verdict: the modal behaves as today. It starts on `comment`, with no mark and no reason row. Q1 MAY change this.
-- The agent recommended `comment`, and the human accepted a blocking finding. The start stays on `comment`, because `comment` is available and the override rules cover only `approve` and `request-changes`. Q1 decides whether decisions alone can move the start, and the same answer applies here.
+- No verdict: the modal behaves as today. It starts on `comment`, with no mark and no reason row (Q1).
+- The agent recommended `comment`, and the human accepted a blocking finding. The start stays on `comment`, because `comment` is available and the override rules cover only `approve` and `request-changes`. Decisions alone never move the start (Q1).
 - The agent recommended `approve` with no findings at all. The start is `approve`.
 - The human goes back from the inline step to the action step with esc. The cursor returns to the action the human chose, as today, not to the start rule.
 - The human leaves the action step with esc and opens it again with `p`. The start is worked out again, because decisions can change in between.
@@ -178,15 +179,15 @@ The `human-review` skill tells the agent to pass its verdict when it sets the su
   - `no published finding is blocking`, for a request-changes turned into comment.
   - `you authored this pull request`, when the start fell back to comment because of the `own-pr` rule.
 - **FR-011**: The start MUST be worked out each time the action step opens from the list. Going back from the inline step MUST keep the human's choice, as today.
-- **FR-012**: With no verdict, the action step MUST behave as today: start on `comment`, with no mark and no reason row. This is pending Q1.
+- **FR-012**: With no verdict, the action step MUST behave as today: start on `comment`, with no mark and no reason row. loupe MUST NOT derive a start from the decisions alone (Q1).
 - **FR-013**: The verdict MUST NOT change `loupe publish --action`, which stays required, and MUST NOT change an unattended publication, which still sends COMMENT.
-- **FR-014**: `loupe summary --help`, the `loupe summary` section and the run-kind table of `specs/001-loupe-v1/contracts/cli.md`, the publish popup paragraph of `docs/tui-design.md`, the draft row of `docs/versioning.md`, and section 5 of `plugin/skills/human-review/SKILL.md` MUST describe the verdict. The skill SHOULD tell the agent to pass its verdict with the summary. The skill MUST say that the verdict only sets where the human's modal starts and that the human's decisions override it.
-- **FR-015**: The verdict MUST NOT appear in `loupe show`, the `summary` result, the attempt, the receipt, the `loupe-meta` marker, `loupe stats` or the published review. This is pending Q2.
+- **FR-014**: `loupe summary --help`, `loupe show --help`, the `loupe summary` and `loupe show` sections and the run-kind table of `specs/001-loupe-v1/contracts/cli.md`, the publish popup paragraph of `docs/tui-design.md`, the draft row of `docs/versioning.md`, and section 5 of `plugin/skills/human-review/SKILL.md` MUST describe the verdict. The skill SHOULD tell the agent to pass its verdict with the summary. The skill MUST say that the verdict only sets where the human's modal starts and that the human's decisions override it.
+- **FR-015**: `loupe show --json` MUST carry the stored verdict as `verdict` and MUST omit the key when the draft has none. The verdict MUST NOT appear in `loupe show` without `--json`, the `summary` result, the attempt, the receipt, the `loupe-meta` marker, `loupe stats` or the published review (Q2).
 - **FR-016**: Tests MUST use local Git repositories, the fake GitHub and injected terminal input (Principle VII). The goldens of `loupe summary --help` and of the action step MUST be regenerated deliberately.
 
 ### Key Entities
 
-- **Verdict**: the agent's recommended action for one round, one of `comment`, `approve` or `request-changes`, or absent. It lives on the round's draft, `loupe summary` sets or clears it, and only the publish modal's action step reads it.
+- **Verdict**: the agent's recommended action for one round, one of `comment`, `approve` or `request-changes`, or absent. It lives on the round's draft, `loupe summary` sets or clears it, the publish modal's action step reads it, and `loupe show --json` reports it.
 - **Start**: the action the cursor rests on when the action step opens. It is derived from the verdict, the draft's publishable set and the viewer and author recorded at capture, each time the step opens. It is never stored.
 - **Reason row**: one line in the action step that explains a start that differs from the verdict. It is never stored and never published.
 
@@ -198,7 +199,7 @@ The `human-review` skill tells the agent to pass its verdict when it sets the su
 - **SC-002**: On every seeded combination of verdict, blocking decisions and own pull request, the start is an action that `ActionRefusal` accepts.
 - **SC-003**: Every start that differs from the verdict shows a reason row that names the cause.
 - **SC-004**: A run with no verdict draws the same action step as today, byte for byte in the golden.
-- **SC-005**: No published review, receipt, digest or `--json` result changes, pending Q2.
+- **SC-005**: No published review, receipt, digest or `--json` result changes, apart from the `verdict` key of `loupe show --json`.
 - **SC-006**: `mise run check` passes.
 
 ## Assumptions

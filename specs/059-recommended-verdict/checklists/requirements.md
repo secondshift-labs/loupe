@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,6 @@
 
 ## Notes
 
-- Two markers remain on purpose, Q1 and Q2. The brief asks that Q1 be flagged and not decided, and that any effect beyond the modal be left as an open question. FR-012 and FR-015 hold today's behavior until the owner answers.
+- The owner settled Q1 and Q2 on 2026-11-20, each as recommended. FR-012 keeps the `comment` start with no verdict, and FR-015 limits the verdict's reach to `loupe show --json`.
 - As in earlier loupe specs, the requirements name `publish.ActionRefusal`, refusal codes, the draft schema and contract files, because the CLI contract and the constitution pin them. Those names are the contract, not implementation detail.
 - The clarify scan found no other ambiguity that changes the plan. The points it settled from the code are under "Settled in this specification".

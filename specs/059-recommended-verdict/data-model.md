@@ -10,8 +10,8 @@ Schema 8 adds one field to schema 7. Every other field is unchanged.
 | :--- | :--- | :--- |
 | `verdict` | string | `omitempty`. One of `comment`, `approve` or `request-changes` when `loupe summary` writes it. Absent on a local run and when the agent gave none |
 
-- `loupe summary` sets it in the same mutation as `summary` and clears it when the call carries none.
-- `loupe edit`, the human's decisions and `loupe review` never change it.
+- `loupe summary` by the agent sets it in the same mutation as `summary` and clears it when the call carries none. `--by human` keeps it.
+- `loupe edit`, the human's decisions, `loupe review` and `loupe summary --by human` never change it.
 - A new round's capture writes an empty draft, so the field starts absent each round.
 - The digest does not include it. The draft's `version` counter still moves once per `summary` call.
 

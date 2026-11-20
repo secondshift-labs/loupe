@@ -14,9 +14,10 @@ Spec 059 left no open marker. Each decision below settles how a requirement maps
 - **Rationale**: the rule needs the blocking set and the availability check, and both are in `gates.go`. A table test in `internal/publish` covers every combination of verdict, blocking decision and own pull request without the review program (SC-002). `ActionRefusal` already writes its messages there, so the reason text has the same home.
 - **Alternatives**: the rule in `internal/tui`. Rejected, because it would read the blocking set a second way, which FR-007 forbids, and it could be tested only through the program.
 
-## D3. The reason text when the candidate is refused
+## D3. The reason text when the candidate is refused (superseded by D10)
 
-- **Decision**: when `ActionRefusal` refuses the candidate with code `own-pr`, `why` ends `you authored this pull request`. A refusal with any other code ends with that refusal's message.
+- **Superseded**: D10 and its amendment replace this. `StartAction` now returns `your own pull request` before it weighs the decisions, and `Unavailable` gives every other refusal the blocking phrase.
+- **Decision (first build)**: when `ActionRefusal` refuses the candidate with code `own-pr`, `why` ends `you authored this pull request`. A refusal with any other code ends with that refusal's message.
 - **Rationale**: the candidate rule already turns `approve` away from a blocking set, so today only `own-pr` can refuse a candidate. The fallback keeps the row truthful if a later spec adds a refusal.
 
 ## D4. A verdict that is not one of the actions

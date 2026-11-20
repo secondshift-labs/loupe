@@ -14,7 +14,7 @@
 
 ## Summary
 
-The agent passes `--verdict` or `"verdict"` to `loupe summary`. `runSummary` checks the value against `publish.Actions` and refuses the bad cases from `contracts/cli-059.md`. `draft.SetSummary` stores the verdict beside the summary and clears it when none is given. `loupe show --json` reports it. In the review program, `p` asks `publish.StartAction` for the start and the reason. The action step opens the cursor on that start, marks the verdict's row `recommended`, and draws the reason under the choices. The decisions in the research are in [research.md](research.md), the record in [data-model.md](data-model.md), and the contract text in [contracts/](contracts/).
+The agent passes `--verdict` or `"verdict"` to `loupe summary`. `runSummary` checks the value against `publish.Actions` and refuses the bad cases from `contracts/cli-059.md`. `draft.SetSummary` stores the verdict beside the summary, and an agent call without one clears it. `loupe show --json` reports it. In the review program, `p` asks `publish.StartAction` for the start and the reason. The action step opens the cursor on that start, marks the verdict's row `recommended`, and on an override gives the reason on that row (research D10). The decisions in the research are in [research.md](research.md), the record in [data-model.md](data-model.md), and the contract text in [contracts/](contracts/).
 
 ## Technical Context
 
@@ -100,7 +100,7 @@ flowchart LR
 | `internal/publish/schema_test.go` | Add the `8:` field set |
 | `internal/tui/app.go` | `Model` gains `startWhy string` |
 | `internal/tui/modeui.go` | `p` sets `m.pick` to the index of the start and `m.startWhy` to `why` (D7) |
-| `internal/tui/list.go` | `actionView` prefixes the verdict row's description with `recommended` and the separator (D5). `publishStep` takes the reason and puts its wrapped rows ahead of the notice rows (D6). `inlineView` passes `""` |
+| `internal/tui/list.go` | `actionView` gives the verdict's row `recommended` and, on an override, the reason in place of its description, and every other unavailable row `unavailable` and `publish.Unavailable`'s short reason. `pickerRow` takes a `pickerText` with a toned lead word. The descriptions are shortened (D10, which replaced the reason rows of D5 and D6) |
 | `internal/tui/*_test.go` | View tests at 80 and 100 columns for a start on the verdict, each of the three reasons, an unavailable recommended row, and no verdict against today's frame. A key test: esc from the inline step returns to the human's action. A short-height test: the reason stays whole |
 | `internal/integration/*_test.go` | `summary --verdict approve`, then `show --json` carries `verdict`, then `summary` without one drops it |
 | `cmd/loupe-demo/seed.go` | Seed `verdict` `approve` on #43 and `request-changes` on #44, so the demo shows an override and a plain start |

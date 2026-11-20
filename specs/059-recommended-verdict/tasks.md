@@ -50,6 +50,14 @@
 - [x] T023 Run `cleanup-comments` over the branch diff. Then run `mise run check` and the patch coverage check from `CONTRIBUTING.md`, and show the output.
 - [x] T024 By eye: follow the tmux steps in `specs/059-recommended-verdict/quickstart.md` on demo runs #43 and #42, in color, with `NO_COLOR=1`, and at 80×24. Capture the action step for the owner, who MAY ask for a styling round on the mark and the reason row.
 
+## Phase 5: After review — the owner's demo, the second review and the PR review
+
+The strings in T003, T005, T013, T014 and T016 are the first build's. These tasks replaced them. `research.md` D10 records the design.
+
+- [x] T025 Put the reason on the verdict's row as `recommended · <reason>`, drop the reason rows under the choices, give every other unavailable row `unavailable · <short reason>` through `publish.Unavailable`, and shorten the descriptions so no row wraps at 80 columns (owner, after the demo, 2026-11-20). Tests in `internal/publish/gates_test.go`, `internal/tui/verdict_test.go`, `internal/tui/list_test.go` and `internal/tui/publishflow_test.go`.
+- [x] T026 In `internal/publish/gates.go`, let an own pull request outrank the decisions in `StartAction`, so `request-changes` on the human's own pull request reads `your own pull request` (second `gpt-6-astra` review).
+- [x] T027 In `internal/draft/mutate.go`, keep the stored verdict on a `summary --by human` call, with tests in `internal/draft/mutate_add_test.go` and `internal/cli/summary_test.go`, and the help, `contracts/cli.md`, spec FR-004 and the data model to match (PR review on #161). Bring the spec's glance, the plan and research D3 in line with D10.
+
 ## Dependencies
 
 ```mermaid

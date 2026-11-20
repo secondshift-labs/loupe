@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/secondshift-labs/loupe/internal/draft"
 	"github.com/secondshift-labs/loupe/internal/local"
 	"github.com/secondshift-labs/loupe/internal/mode"
+	"github.com/secondshift-labs/loupe/internal/publish"
 	"github.com/secondshift-labs/loupe/internal/render"
 	"github.com/secondshift-labs/loupe/internal/run"
 	"github.com/secondshift-labs/loupe/internal/style"
@@ -133,7 +135,8 @@ func (publishUI) listKey(m *Model, key string) (tea.Cmd, bool) {
 	case "p":
 		ready, err := m.readyToEnd()
 		if ready {
-			m.view, m.pick = viewAction, 0
+			start, why := publish.StartAction(m.draft.Verdict, m.target.Viewer, m.target.Author, m.draft)
+			m.view, m.pick, m.startWhy = viewAction, slices.Index(publish.Actions, start), why
 		}
 		return m.fail(err), true
 	}

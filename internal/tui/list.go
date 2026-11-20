@@ -116,16 +116,20 @@ func (m *Model) actionView() string {
 	var picked [2]int
 	for i, action := range publish.Actions {
 		start := len(rows)
+		mark := ""
+		if action == m.draft.Verdict {
+			mark = "recommended " + m.glyphs.Sep + " "
+		}
 		if r, ok := refusal.As(m.actionRefusal(action)); ok {
-			rows = append(rows, m.pickerRow(false, true, action, "unavailable: "+r.Message, m.popupInner())...)
+			rows = append(rows, m.pickerRow(false, true, action, mark+"unavailable: "+r.Message, m.popupInner())...)
 		} else {
-			rows = append(rows, m.pickerRow(i == m.pick, false, action, actionDescriptions[action], m.popupInner())...)
+			rows = append(rows, m.pickerRow(i == m.pick, false, action, mark+actionDescriptions[action], m.popupInner())...)
 		}
 		if i == m.pick {
 			picked = [2]int{start, len(rows)}
 		}
 	}
-	return m.publishStep(0, rows, picked, actionEnter)
+	return m.publishStep(0, rows, picked, actionEnter, m.startWhy)
 }
 
 var inlineDescriptions = map[string]string{
@@ -144,7 +148,7 @@ func (m *Model) inlineView() string {
 			picked = [2]int{start, len(rows)}
 		}
 	}
-	return m.publishStep(1, rows, picked, inlineEnter)
+	return m.publishStep(1, rows, picked, inlineEnter, "")
 }
 
 // publishSteps are the tabs over every publish screen. They label where the flow is and add no key.
@@ -153,8 +157,8 @@ var publishSteps = []string{"Action", "Inline comments", "Message"}
 // publishStep is one choice step, a popup over the dimmed list: the step tabs, then the choices, in a pane whose
 // border says nothing has been sent. The footer says what enter does next. The step that writes the message and shows
 // the whole review is a screen of its own, since it needs the room. picked is the selected choice's rows, which stay
-// in view however short the window.
-func (m *Model) publishStep(step int, rows []string, picked [2]int, enter string) string {
+// in view however short the window. why, when set, sits under the choices and is kept whole, as a refusal is.
+func (m *Model) publishStep(step int, rows []string, picked [2]int, enter, why string) string {
 	footer := m.keys(groupHints(m.publishStepHints(enter))...)
 	width, inner := m.popupWidth(), m.popupInner()
 	room := noticeRoom(width, "")
@@ -165,6 +169,13 @@ func (m *Model) publishStep(step int, rows []string, picked [2]int, enter string
 	// The popup is as tall as its rows, up to the body; the refusal is kept whole, and the rows above give way to it.
 	maxRows := m.height - len(footer) - m.bodyTop() - style.PaneRows
 	notice := m.noticeRows(inner, room)
+	if why != "" {
+		reason := strings.Split(m.styles.Wrap(render.ForDisplay(why), inner, ""), "\n")
+		for i, l := range reason {
+			reason[i] = m.styles.Secondary().Render(l)
+		}
+		notice = append(reason, notice...)
+	}
 	// Blank rows around the steps and above the border give them room. The current step's block marks the focus, so
 	// the title stays plain rather than a second block on top of it.
 	tabs := m.styles.Tabs(publishSteps, step)

@@ -47,7 +47,7 @@ The demo opens `loupe review` on seeded runs against an in-memory GitHub, so not
 ### Review a pull request
 
 1. Ask your agent for a review, as in the quick start. The agent captures the pull request into a *run*: a local draft of one review round, named like `owner/repo#123@1`. It files each *finding* into the run. A finding is a title and a Markdown body, pinned to a line of the diff or general.
-2. Decide each finding in `loupe review`. You accept it, rewrite it, exclude it, or send it back with a note for the agent to answer.
+2. Decide each finding in `loupe review`. You accept it, rewrite it, exclude it, or send it back with a note. The agent, blocked on `loupe wait`, gets the note, replies or edits the finding, and you see its answer in the same window.
 3. Publish. Press `p` in `loupe review`, or run `loupe publish`. The confirmation shows the review as it will read, with its exact Markdown one key away. You type the review's opening, and `y` posts one GitHub review.
 
 <picture>
@@ -86,23 +86,6 @@ Runs are stored under `$XDG_DATA_HOME/loupe`, else `~/.local/share/loupe`. Set `
 To stop your agent asking for approval at each hand-off, allow `loupe handoff`. [Handing off in a terminal pane](docs/review-workflow.md#handing-off-in-a-terminal-pane) gives the rule.
 
 ## How it works
-
-```mermaid
-sequenceDiagram
-    participant Agent as Review agent
-    participant Run as loupe run
-    actor You
-    participant GitHub
-    Agent->>Run: capture the pull request
-    Agent->>Run: add findings and a summary
-    Agent->>You: hand off loupe review in a new pane
-    You->>Run: decide each finding
-    You->>Run: send a finding back with a note
-    Run-->>Agent: loupe wait returns the note
-    Agent->>Run: reply or edit the finding
-    You->>Run: confirm the review
-    Run->>GitHub: post one review
-```
 
 - **Nothing posts under your name unread.** You decide each finding yourself, you write the review's opening, and one confirmation sends one review. Only you run `loupe review` and `loupe publish`. Both refuse without an interactive terminal, except the unattended publish that CI uses.
 - **Any review agent works.** loupe has no opinion on how findings are found. The agent files them through the `loupe` CLI, and the plugin's `human-review` and `human-decide` skills teach it the workflow. To connect a review skill you already have, see [the review workflow](docs/review-workflow.md#adapting-a-review-skill-you-already-have).
